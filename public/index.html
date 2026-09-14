@@ -1,4 +1,5 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="pt-BR">
 
 <head>
@@ -7,224 +8,436 @@
 
 <meta
     name="viewport"
-    content="width=device-width,initial-scale=1"
+    content="width=device-width, initial-scale=1.0"
 >
 
 <title>STOP Multiplayer</title>
 
+<script src="/socket.io/socket.io.js"></script>
+
 <style>
 
-*{
-    box-sizing:border-box;
+* {
+    box-sizing: border-box;
 }
 
-body{
-    font-family:Arial;
-    background:#111827;
-    color:white;
-    text-align:center;
-    margin:0;
-    padding:25px;
+body {
+
+    margin: 0;
+
+    font-family: Arial, sans-serif;
+
+    background:
+        linear-gradient(
+            135deg,
+            #111827,
+            #1f2937
+        );
+
+    color: white;
+
+    min-height: 100vh;
+
+    padding: 20px;
 }
 
-main{
-    max-width:900px;
-    margin:auto;
+.container {
+
+    width: 100%;
+
+    max-width: 1100px;
+
+    margin: auto;
 }
 
-.card{
-    background:#1f2937;
-    padding:25px;
-    border-radius:18px;
-    margin:15px 0;
-    box-shadow:0 5px 20px rgba(0,0,0,.25);
+h1 {
+
+    text-align: center;
+
+    font-size: 70px;
+
+    margin: 10px 0 30px;
+
+    color: #ef4444;
+
+    text-shadow:
+        0 0 20px rgba(239,68,68,0.5);
 }
 
-input,
-button{
-    padding:13px;
-    margin:6px;
-    border-radius:10px;
-    border:0;
-    font-size:16px;
+h2 {
+
+    text-align: center;
+
+    margin-bottom: 20px;
 }
 
-input{
-    width:85%;
+.card {
+
+    background: #1e293b;
+
+    border-radius: 15px;
+
+    padding: 25px;
+
+    margin-bottom: 20px;
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,0.3);
 }
 
-button{
-    background:#22c55e;
-    color:#000;
-    font-weight:bold;
-    cursor:pointer;
+input {
+
+    width: 100%;
+
+    padding: 14px;
+
+    margin: 8px 0;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 18px;
 }
 
-button:hover{
-    opacity:.85;
+button {
+
+    border: none;
+
+    border-radius: 8px;
+
+    padding: 13px 20px;
+
+    margin: 5px;
+
+    font-size: 17px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.2s;
 }
 
-button:disabled{
-    cursor:not-allowed;
-    opacity:.55;
+button:hover {
+
+    transform: scale(1.04);
 }
 
-.danger{
-    background:#ef4444;
-    color:white;
+.btn-primary {
+
+    background: #2563eb;
+
+    color: white;
 }
 
-#codigo{
-    font-size:45px;
-    font-weight:bold;
-    letter-spacing:8px;
+.btn-success {
+
+    background: #16a34a;
+
+    color: white;
 }
 
-#letra{
-    font-size:70px;
-    font-weight:bold;
-    color:#22c55e;
+.btn-danger {
+
+    background: #dc2626;
+
+    color: white;
 }
 
-#tempo{
-    font-size:28px;
-    font-weight:bold;
-    margin:15px;
+.btn-correct {
+
+    background: #16a34a;
+
+    color: white;
 }
 
-#tempoVotacao{
-    font-size:28px;
-    font-weight:bold;
-    margin:15px;
+.btn-wrong {
+
+    background: #dc2626;
+
+    color: white;
 }
 
-.cats{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:15px;
+button:disabled {
+
+    opacity: 0.45;
+
+    cursor: not-allowed;
+
+    transform: none;
 }
 
-.categoria{
-    background:#374151;
-    padding:15px;
-    border-radius:12px;
+.hidden {
+
+    display: none !important;
 }
 
-.player{
-    display:inline-block;
-    background:#374151;
-    padding:8px 12px;
-    margin:4px;
-    border-radius:8px;
+.room-code {
+
+    text-align: center;
+
+    font-size: 35px;
+
+    font-weight: bold;
+
+    color: #facc15;
+
+    letter-spacing: 5px;
+
+    margin: 15px;
 }
 
-.votacao-resposta{
-    background:#374151;
-    padding:20px;
-    margin:15px 0;
-    border-radius:15px;
-    transition:.2s;
+.players {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fit, minmax(180px, 1fr));
+
+    gap: 10px;
+
+    margin-top: 20px;
 }
 
-.votacao-resposta.votou{
-    border:3px solid #22c55e;
-    background:#263d31;
+.player {
+
+    background: #334155;
+
+    padding: 15px;
+
+    border-radius: 10px;
+
+    text-align: center;
 }
 
-.votacao-resposta.propria{
-    border:3px solid #6b7280;
+.letter {
+
+    text-align: center;
+
+    font-size: 80px;
+
+    font-weight: bold;
+
+    color: #facc15;
+
+    margin: 10px;
 }
 
-.nome-jogador{
-    font-size:20px;
-    font-weight:bold;
+.timer {
+
+    text-align: center;
+
+    font-size: 40px;
+
+    font-weight: bold;
+
+    color: #38bdf8;
+
+    margin: 15px;
 }
 
-.resposta-texto{
-    font-size:27px;
-    font-weight:bold;
-    margin:15px;
-    word-break:break-word;
+.categories {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fit, minmax(250px, 1fr));
+
+    gap: 15px;
 }
 
-.botoes-voto button{
-    min-width:140px;
+.category {
+
+    background: #334155;
+
+    padding: 15px;
+
+    border-radius: 10px;
 }
 
-.correct{
-    background:#22c55e;
-    color:white;
+.category label {
+
+    display: block;
+
+    font-size: 20px;
+
+    font-weight: bold;
+
+    margin-bottom: 8px;
+
+    color: #facc15;
 }
 
-.wrong{
-    background:#ef4444;
-    color:white;
+.stop-area {
+
+    text-align: center;
+
+    margin-top: 25px;
 }
 
-.voto-mensagem{
-    color:#22c55e;
-    font-weight:bold;
-    margin-top:12px;
+.stop-button {
+
+    width: 220px;
+
+    height: 80px;
+
+    border-radius: 50%;
+
+    background: #dc2626;
+
+    color: white;
+
+    font-size: 30px;
+
+    box-shadow:
+        0 0 30px rgba(220,38,38,0.5);
 }
 
-.sem-voto{
-    color:#9ca3af;
-    margin-top:10px;
+.voting-title {
+
+    text-align: center;
+
+    font-size: 35px;
+
+    color: #facc15;
+
+    margin-bottom: 20px;
 }
 
-.aprovada{
-    border:3px solid #22c55e;
+.answer-card {
+
+    background: #334155;
+
+    border-radius: 12px;
+
+    padding: 20px;
+
+    margin-bottom: 15px;
+
+    border: 2px solid transparent;
 }
 
-.reprovada{
-    border:3px solid #ef4444;
+.answer-card h3 {
+
+    margin-top: 0;
+
+    color: #38bdf8;
 }
 
-.empate{
-    border:3px solid #facc15;
+.answer-text {
+
+    font-size: 26px;
+
+    background: #0f172a;
+
+    padding: 15px;
+
+    border-radius: 8px;
+
+    margin: 15px 0;
+
+    word-break: break-word;
 }
 
-.resultado-jogador{
-    background:#374151;
-    padding:15px;
-    margin:10px 0;
-    border-radius:12px;
+.vote-buttons {
+
+    display: flex;
+
+    gap: 10px;
+
+    flex-wrap: wrap;
 }
 
-.primeiro{
-    border:3px solid #facc15;
+.vote-status {
+
+    padding: 12px;
+
+    border-radius: 8px;
+
+    background: #475569;
+
+    margin-top: 10px;
+
+    font-weight: bold;
 }
 
-.hidden{
-    display:none !important;
+.my-answer {
+
+    border-color: #64748b;
+
+    opacity: 0.8;
 }
 
-@media(max-width:600px){
+.result-card {
 
-    body{
-        padding:10px;
-    }
+    background: #334155;
 
-    .cats{
-        grid-template-columns:1fr;
-    }
+    padding: 15px;
 
-    input{
-        width:95%;
-    }
+    margin: 10px 0;
 
-    button{
-        width:90%;
-    }
+    border-radius: 10px;
+}
 
-    #letra{
-        font-size:55px;
-    }
+.correct {
 
-    #codigo{
-        font-size:35px;
-    }
+    border-left: 6px solid #22c55e;
+}
 
+.wrong {
+
+    border-left: 6px solid #ef4444;
+}
+
+.score {
+
+    color: #facc15;
+
+    font-weight: bold;
+}
+
+.ranking {
+
+    text-align: center;
+}
+
+.rank-item {
+
+    background: #334155;
+
+    padding: 18px;
+
+    border-radius: 10px;
+
+    margin: 10px 0;
+
+    font-size: 22px;
+}
+
+.rank-1 {
+
+    font-size: 30px;
+
+    background: #854d0e;
+}
+
+.message {
+
+    text-align: center;
+
+    font-size: 20px;
+
+    margin: 15px;
+
+    color: #facc15;
+}
+
+.small {
+
+    color: #94a3b8;
+
+    font-size: 14px;
 }
 
 </style>
@@ -233,1565 +446,1073 @@ button:disabled{
 
 <body>
 
-<main>
+<div class="container">
 
 <h1>🛑 STOP</h1>
 
-<div id="status">
-🔴 Conectando...
-</div>
-
-
-<!-- ========================================= -->
+<!-- ================================= -->
 <!-- MENU -->
-<!-- ========================================= -->
+<!-- ================================= -->
 
-<div
-    id="menu"
-    class="card"
->
+<div id="menu" class="card">
 
-<h2>Entrar no jogo</h2>
+    <h2>Entrar no jogo</h2>
 
-<input
-    id="nome"
-    placeholder="Seu nome"
-    maxlength="20"
->
+    <input
+        type="text"
+        id="nome"
+        placeholder="Digite seu nome"
+    >
 
-<br>
+    <button
+        class="btn-success"
+        onclick="criarSala()"
+    >
+        Criar sala
+    </button>
 
-<button onclick="criar()">
-🏠 Criar sala
-</button>
+    <hr>
 
-<br>
+    <input
+        type="text"
+        id="codigo"
+        placeholder="Código da sala"
+        maxlength="4"
+    >
 
-<input
-    id="codin"
-    placeholder="Código da sala"
-    maxlength="6"
->
-
-<button onclick="entrar()">
-🚪 Entrar
-</button>
+    <button
+        class="btn-primary"
+        onclick="entrarSala()"
+    >
+        Entrar na sala
+    </button>
 
 </div>
 
+<!-- ================================= -->
+<!-- SALA -->
+<!-- ================================= -->
 
-<!-- ========================================= -->
+<div id="sala" class="card hidden">
+
+    <h2>Sala</h2>
+
+    <div
+        id="codigoSala"
+        class="room-code"
+    >
+    </div>
+
+    <p class="small" style="text-align:center;">
+        Compartilhe este código com os outros jogadores.
+    </p>
+
+    <h2>Jogadores</h2>
+
+    <div
+        id="listaJogadores"
+        class="players"
+    >
+    </div>
+
+    <div style="text-align:center; margin-top:20px;">
+
+        <button
+            id="botaoIniciar"
+            class="btn-success"
+            onclick="iniciarJogo()"
+        >
+            ▶️ Iniciar jogo
+        </button>
+
+    </div>
+
+</div>
+
+<!-- ================================= -->
 <!-- JOGO -->
-<!-- ========================================= -->
+<!-- ================================= -->
 
 <div
     id="jogo"
-    class="hidden"
+    class="card hidden"
 >
 
+    <h2>Rodada</h2>
 
-<!-- SALA -->
+    <div
+        id="letra"
+        class="letter"
+    >
+    </div>
 
-<div
-    id="salaCard"
-    class="card"
->
+    <div
+        id="timer"
+        class="timer"
+    >
+        60
+    </div>
 
-<h2>
-Código da sala
-</h2>
+    <div
+        id="mensagemRodada"
+        class="message"
+    >
+        Preencha todas as categorias!
+    </div>
 
-<div id="codigo"></div>
+    <div
+        id="categorias"
+        class="categories"
+    >
+    </div>
 
-<div id="players"></div>
+    <div class="stop-area">
 
-<button
-    id="start"
-    onclick="iniciar()"
->
-▶️ Iniciar rodada
-</button>
+        <button
+            class="stop-button"
+            onclick="enviarStop()"
+        >
+            STOP!
+        </button>
+
+    </div>
 
 </div>
 
-
-<!-- ========================================= -->
-<!-- RESPONDER -->
-<!-- ========================================= -->
-
-<div
-    id="respostasCard"
-    class="card"
->
-
-<h2>
-📝 Responda!
-</h2>
-
-<div id="letra">
-?
-</div>
-
-<div id="tempo">
-</div>
-
-<div
-    id="cats"
-    class="cats"
-></div>
-
-<br>
-
-<button onclick="enviar()">
-📤 Salvar respostas
-</button>
-
-<button
-    class="danger"
-    onclick="enviarStop()"
->
-🛑 STOP!
-</button>
-
-</div>
-
-
-<!-- ========================================= -->
+<!-- ================================= -->
 <!-- VOTAÇÃO -->
-<!-- ========================================= -->
+<!-- ================================= -->
 
 <div
-    id="votacaoCard"
+    id="votacao"
     class="card hidden"
 >
 
-<h2 id="tituloVotacao">
-🗳️ Votação
-</h2>
+    <div
+        id="tituloVotacao"
+        class="voting-title"
+    >
+    </div>
 
-<div id="progresso"></div>
+    <div
+        id="timerVotacao"
+        class="timer"
+    >
+        60
+    </div>
 
-<div id="tempoVotacao">
+    <div
+        id="explicacaoVotacao"
+        class="message"
+    >
+        Vote nas respostas dos outros jogadores.
+    </div>
+
+    <div
+        id="listaRespostas"
+    >
+    </div>
+
 </div>
 
-<p>
-Analise as respostas dos outros jogadores.
-</p>
-
-<div id="votacoes">
-</div>
-
-</div>
-
-
-<!-- ========================================= -->
+<!-- ================================= -->
 <!-- RESULTADO DA CATEGORIA -->
-<!-- ========================================= -->
+<!-- ================================= -->
 
 <div
-    id="resultadoVotacaoCard"
+    id="resultadoCategoria"
     class="card hidden"
 >
 
-<h2>
-⚖️ Resultado da votação
-</h2>
+    <h2>Resultado da categoria</h2>
 
-<div id="resultadoVotacao">
+    <div
+        id="resultadoCategoriaConteudo"
+    >
+    </div>
+
 </div>
 
-</div>
-
-
-<!-- ========================================= -->
+<!-- ================================= -->
 <!-- RESULTADO FINAL -->
-<!-- ========================================= -->
+<!-- ================================= -->
 
 <div
-    id="res"
+    id="resultadoFinal"
     class="card hidden"
 >
+
+    <h2>🏆 Resultado Final</h2>
+
+    <div
+        id="ranking"
+        class="ranking"
+    >
+    </div>
+
+    <div style="text-align:center;">
+
+        <button
+            class="btn-primary"
+            onclick="voltarSala()"
+        >
+            Voltar para a sala
+        </button>
+
+    </div>
+
 </div>
 
-
 </div>
-
-</main>
-
-
-<script src="/socket.io/socket.io.js"></script>
 
 <script>
 
-const s = io();
+// ==========================================
+// SOCKET
+// ==========================================
 
+const socket = io();
 
-let dono = false;
+let meuId = null;
+let codigoAtual = "";
+let categoriasAtuais = [];
 
-let salaAtual = null;
+let respostasLocais = {};
 
-let categoriaAtual = null;
+let faseAtual = "";
 
-
-// Guarda quais respostas
-// o jogador atual já votou
-
-const meusVotos = {};
-
-
-// ==============================================
-// ELEMENTOS
-// ==============================================
-
-const menu =
-document.getElementById("menu");
-
-const jogo =
-document.getElementById("jogo");
-
-const nomeInput =
-document.getElementById("nome");
-
-const codigoInput =
-document.getElementById("codin");
-
-const codigo =
-document.getElementById("codigo");
-
-const players =
-document.getElementById("players");
-
-const start =
-document.getElementById("start");
-
-const letra =
-document.getElementById("letra");
-
-const tempo =
-document.getElementById("tempo");
-
-const cats =
-document.getElementById("cats");
-
-const respostasCard =
-document.getElementById(
-    "respostasCard"
-);
-
-const votacaoCard =
-document.getElementById(
-    "votacaoCard"
-);
-
-const votacoes =
-document.getElementById(
-    "votacoes"
-);
-
-const tituloVotacao =
-document.getElementById(
-    "tituloVotacao"
-);
-
-const progresso =
-document.getElementById(
-    "progresso"
-);
-
-const tempoVotacao =
-document.getElementById(
-    "tempoVotacao"
-);
-
-const resultadoVotacaoCard =
-document.getElementById(
-    "resultadoVotacaoCard"
-);
-
-const resultadoVotacao =
-document.getElementById(
-    "resultadoVotacao"
-);
-
-const res =
-document.getElementById("res");
-
-
-// ==============================================
+// ==========================================
 // CONEXÃO
-// ==============================================
+// ==========================================
 
-s.on(
-    "connect",
-    () => {
+socket.on("connect", () => {
 
-        status(
-            "🟢 Conectado ao servidor!"
-        );
+    meuId = socket.id;
 
+});
+
+// ==========================================
+// ERRO
+// ==========================================
+
+socket.on("erro", mensagem => {
+
+    alert(mensagem);
+
+});
+
+// ==========================================
+// CRIAR SALA
+// ==========================================
+
+function criarSala() {
+
+    const nome =
+        document.getElementById("nome")
+            .value
+            .trim();
+
+    if (!nome) {
+
+        alert("Digite seu nome.");
+
+        return;
     }
-);
 
+    socket.emit(
+        "criarSala",
+        nome
+    );
+}
 
-s.on(
-    "connect_error",
-    () => {
-
-        status(
-            "🔴 Servidor não conectado"
-        );
-
-    }
-);
-
-
-s.on(
-    "erro",
-    mensagem => {
-
-        alert(mensagem);
-
-    }
-);
-
-
-// ==============================================
+// ==========================================
 // SALA CRIADA
-// ==============================================
+// ==========================================
 
-s.on(
-    "salaCriada",
-    c => {
+socket.on("salaCriada", dados => {
 
-        dono = true;
+    codigoAtual = dados.codigo;
 
-        salaAtual = c;
+    entrarNaTelaSala();
 
-        abrir(c);
+});
 
+// ==========================================
+// ENTRAR NA SALA
+// ==========================================
+
+function entrarSala() {
+
+    const nome =
+        document.getElementById("nome")
+            .value
+            .trim();
+
+    const codigo =
+        document.getElementById("codigo")
+            .value
+            .trim()
+            .toUpperCase();
+
+    if (!nome) {
+
+        alert("Digite seu nome.");
+
+        return;
     }
-);
 
+    if (!codigo) {
 
-// ==============================================
+        alert("Digite o código da sala.");
+
+        return;
+    }
+
+    socket.emit(
+        "entrarSala",
+        {
+            nome: nome,
+            codigo: codigo
+        }
+    );
+}
+
+// ==========================================
 // ENTROU
-// ==============================================
+// ==========================================
 
-s.on(
-    "entrouSala",
-    c => {
+socket.on("entrouSala", dados => {
 
-        salaAtual = c;
+    codigoAtual = dados.codigo;
 
-        abrir(c);
+    entrarNaTelaSala();
 
-    }
-);
+});
 
+// ==========================================
+// MOSTRAR SALA
+// ==========================================
 
-// ==============================================
-// NOVO DONO
-// ==============================================
+function entrarNaTelaSala() {
 
-s.on(
-    "novoDono",
-    id => {
+    document
+        .getElementById("menu")
+        .classList.add("hidden");
 
-        if(id === s.id){
+    document
+        .getElementById("sala")
+        .classList.remove("hidden");
 
-            dono = true;
+    document
+        .getElementById("codigoSala")
+        .textContent = codigoAtual;
 
-            alert(
-                "👑 Você agora é o dono da sala!"
-            );
+}
 
+// ==========================================
+// ESTADO DA SALA
+// ==========================================
+
+socket.on("estadoSala", sala => {
+
+    codigoAtual = sala.codigo;
+
+    document
+        .getElementById("codigoSala")
+        .textContent = sala.codigo;
+
+    const lista =
+        document.getElementById(
+            "listaJogadores"
+        );
+
+    lista.innerHTML = "";
+
+    sala.jogadores.forEach(jogador => {
+
+        const div =
+            document.createElement("div");
+
+        div.className = "player";
+
+        div.innerHTML = `
+            <strong>${jogador.nome}</strong>
+            <br>
+            <span class="score">
+                ${formatarPontos(jogador.pontos)} pontos
+            </span>
+        `;
+
+        if (jogador.id === sala.dono) {
+
+            div.innerHTML += `
+                <br>
+                👑 Dono
+            `;
         }
 
+        lista.appendChild(div);
+    });
+
+    const botao =
+        document.getElementById(
+            "botaoIniciar"
+        );
+
+    if (sala.dono === meuId) {
+
+        botao.classList.remove("hidden");
+
+    } else {
+
+        botao.classList.add("hidden");
     }
-);
 
+});
 
-// ==============================================
-// ESTADO DA SALA
-// ==============================================
+// ==========================================
+// NOVO DONO
+// ==========================================
 
-s.on(
-    "estadoSala",
-    x => {
+socket.on("novoDono", novoDono => {
 
-        players.innerHTML =
-            x.jogadores
-            .map(p => `
+    if (novoDono === meuId) {
 
-                <span class="player">
-
-                    👤
-                    ${escapeHTML(p.nome)}
-
-                    —
-                    ${p.pontos}
-                    pts
-
-                </span>
-
-            `)
-            .join("");
-
-
-        start.style.display =
-            dono &&
-            !x.iniciada
-            ?
-            "inline-block"
-            :
-            "none";
-
+        document
+            .getElementById("botaoIniciar")
+            .classList.remove("hidden");
     }
-);
 
+});
 
-// ==============================================
+// ==========================================
+// INICIAR
+// ==========================================
+
+function iniciarJogo() {
+
+    socket.emit("iniciar");
+
+}
+
+// ==========================================
 // NOVA RODADA
-// ==============================================
+// ==========================================
 
-s.on(
-    "rodada",
-    x => {
+socket.on("rodada", dados => {
 
-        respostasCard.classList.remove(
-            "hidden"
+    faseAtual = "respostas";
+
+    categoriasAtuais =
+        dados.categorias;
+
+    respostasLocais = {};
+
+    document
+        .getElementById("sala")
+        .classList.add("hidden");
+
+    document
+        .getElementById("jogo")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("votacao")
+        .classList.add("hidden");
+
+    document
+        .getElementById("resultadoCategoria")
+        .classList.add("hidden");
+
+    document
+        .getElementById("resultadoFinal")
+        .classList.add("hidden");
+
+    document
+        .getElementById("letra")
+        .textContent = dados.letra;
+
+    criarCamposCategorias();
+
+});
+
+// ==========================================
+// CRIAR CATEGORIAS
+// ==========================================
+
+function criarCamposCategorias() {
+
+    const container =
+        document.getElementById(
+            "categorias"
         );
 
-        votacaoCard.classList.add(
-            "hidden"
+    container.innerHTML = "";
+
+    categoriasAtuais.forEach(categoria => {
+
+        const div =
+            document.createElement("div");
+
+        div.className = "category";
+
+        div.innerHTML = `
+
+            <label>
+                ${categoria}
+            </label>
+
+            <input
+                type="text"
+                id="campo-${categoria}"
+                placeholder="Digite aqui..."
+                autocomplete="off"
+            >
+
+        `;
+
+        container.appendChild(div);
+
+        const input =
+            div.querySelector("input");
+
+        input.addEventListener(
+            "input",
+            () => {
+
+                salvarCampo(
+                    categoria,
+                    input.value
+                );
+
+            }
         );
+    });
 
-        resultadoVotacaoCard.classList.add(
-            "hidden"
-        );
+}
 
-        res.classList.add(
-            "hidden"
-        );
-
-
-        letra.textContent =
-            x.letra;
-
-
-        tempo.textContent =
-            x.tempo + "s";
-
-
-        cats.innerHTML =
-            x.categorias
-            .map(c => `
-
-                <div class="categoria">
-
-                    <b>
-                        ${escapeHTML(c)}
-                    </b>
-
-                    <br>
-
-                    <input
-                        id="c_${escapeHTML(c)}"
-                        placeholder="${escapeHTML(c)}"
-                        autocomplete="off"
-                        oninput="
-                            salvarCampo(
-                                '${escapeHTML(c)}',
-                                this.value
-                            )
-                        "
-                    >
-
-                </div>
-
-            `)
-            .join("");
-
-    }
-);
-
-
-// ==============================================
-// SALVAR CADA CAMPO INDIVIDUALMENTE
-// ==============================================
+// ==========================================
+// SALVAR CAMPO
+// ==========================================
 
 function salvarCampo(
     categoria,
     resposta
-){
+) {
 
-    s.emit(
+    respostasLocais[categoria] =
+        resposta;
+
+    socket.emit(
         "respostaDigitada",
         {
-
-            categoria,
-
-            resposta
-
+            categoria: categoria,
+            resposta: resposta
         }
     );
 
 }
 
-
-// ==============================================
-// TEMPO DA RODADA
-// ==============================================
-
-s.on(
-    "tempo",
-    x => {
-
-        tempo.textContent =
-            x + "s";
-
-    }
-);
-
-
-// ==============================================
-// TEMPO ACABOU
-// ==============================================
-
-s.on(
-    "tempoAcabou",
-    () => {
-
-        tempo.textContent =
-            "⏰ TEMPO ACABOU!";
-
-        bloquearRespostas();
-
-    }
-);
-
-
-// ==============================================
+// ==========================================
 // STOP
-// ==============================================
+// ==========================================
 
-s.on(
-    "stop",
-    x => {
+function enviarStop() {
 
-        bloquearRespostas();
+    const respostas = {};
 
+    categoriasAtuais.forEach(categoria => {
 
-        if(
-            x.jogadorId === s.id
-        ){
-
-            mostrarMensagem(
-                "🛑 Você apertou STOP!"
+        const campo =
+            document.getElementById(
+                `campo-${categoria}`
             );
 
-        }
-
-        else{
-
-            mostrarMensagem(
-                "🛑 STOP! A rodada terminou."
-            );
-
-        }
-
-    }
-);
-
-
-// ==============================================
-// COMEÇOU A VOTAÇÃO
-// ==============================================
-
-s.on(
-    "votacao",
-    x => {
-
-        respostasCard.classList.add(
-            "hidden"
-        );
-
-        resultadoVotacaoCard.classList.add(
-            "hidden"
-        );
-
-        votacaoCard.classList.remove(
-            "hidden"
-        );
-
-
-        categoriaAtual =
-            x.categoria;
-
-
-        // Limpa votos da categoria anterior
-
-        for(
-            const chave in meusVotos
-        ){
-
-            delete meusVotos[chave];
-
-        }
-
-
-        tituloVotacao.textContent =
-            "🗳️ Votação — " +
-            x.categoria;
-
-
-        progresso.textContent =
-            "Categoria " +
-            x.numeroCategoria +
-            " de " +
-            x.totalCategorias;
-
-
-        tempoVotacao.textContent =
-            "⏱️ Tempo para votar: " +
-            x.tempo +
-            "s";
-
-
-        mostrarVotacoes(
-            x.respostas
-        );
-
-    }
-);
-
-
-// ==============================================
-// TEMPO DA VOTAÇÃO
-// ==============================================
-
-s.on(
-    "tempoVotacao",
-    segundos => {
-
-        tempoVotacao.textContent =
-            "⏱️ Tempo para votar: " +
-            segundos +
-            "s";
-
-    }
-);
-
-
-// ==============================================
-// MOSTRAR TODAS AS RESPOSTAS
-// ==============================================
-
-function mostrarVotacoes(
-    respostas
-){
-
-    votacoes.innerHTML = "";
-
-
-    respostas.forEach(
-        respostaJogador => {
-
-            const div =
-                document.createElement(
-                    "div"
-                );
-
-
-            div.className =
-                "votacao-resposta";
-
-
-            const resposta =
-                respostaJogador.resposta
-                .trim();
-
-
-            // ========================================
-            // PRÓPRIA RESPOSTA
-            // ========================================
-
-            if(
-                respostaJogador.jogadorId ===
-                s.id
-            ){
-
-                div.classList.add(
-                    "propria"
-                );
-
-
-                div.innerHTML = `
-
-                    <div class="nome-jogador">
-
-                        👤
-                        ${escapeHTML(
-                            respostaJogador.nome
-                        )}
-
-                    </div>
-
-                    <div class="resposta-texto">
-
-                        ${
-                            resposta
-                            ?
-                            escapeHTML(
-                                resposta
-                            )
-                            :
-                            "(sem resposta)"
-                        }
-
-                    </div>
-
-                    <div class="sem-voto">
-
-                        🚫 Esta é sua resposta.
-                        Você não pode votar nela.
-
-                    </div>
-
-                `;
-
-            }
-
-
-            // ========================================
-            // RESPOSTA DOS OUTROS
-            // ========================================
-
-            else{
-
-                div.innerHTML = `
-
-                    <div class="nome-jogador">
-
-                        👤
-                        ${escapeHTML(
-                            respostaJogador.nome
-                        )}
-
-                    </div>
-
-                    <div class="resposta-texto">
-
-                        ${
-                            resposta
-                            ?
-                            escapeHTML(
-                                resposta
-                            )
-                            :
-                            "(sem resposta)"
-                        }
-
-                    </div>
-
-                    <div
-                        class="botoes-voto"
-                    >
-
-                        <button
-                            class="correct"
-                            onclick="
-                                votar(
-                                    '${respostaJogador.jogadorId}',
-                                    'correta',
-                                    this
-                                )
-                            "
-                        >
-                            ✅ CORRETA
-                        </button>
-
-
-                        <button
-                            class="wrong"
-                            onclick="
-                                votar(
-                                    '${respostaJogador.jogadorId}',
-                                    'errada',
-                                    this
-                                )
-                            "
-                        >
-                            ❌ ERRADA
-                        </button>
-
-                    </div>
-
-
-                    <div
-                        class="voto-mensagem"
-                        id="
-                            voto_${respostaJogador.jogadorId}
-                        "
-                    ></div>
-
-                `;
-
-            }
-
-
-            votacoes.appendChild(
-                div
-            );
-
-        }
+        respostas[categoria] =
+            campo
+                ? campo.value.trim()
+                : "";
+    });
+
+    socket.emit(
+        "respostas",
+        respostas
     );
+
+    socket.emit("stop");
 
 }
 
+// ==========================================
+// STOP RECEBIDO
+// ==========================================
 
-// ==============================================
+socket.on("stop", () => {
+
+    faseAtual = "votacao";
+
+    document
+        .getElementById("jogo")
+        .classList.add("hidden");
+
+    document
+        .getElementById("votacao")
+        .classList.remove("hidden");
+
+});
+
+// ==========================================
+// TIMER
+// ==========================================
+
+socket.on("tempo", dados => {
+
+    const timer =
+        document.getElementById(
+            dados.fase === "respostas"
+                ? "timer"
+                : "timerVotacao"
+        );
+
+    if (timer) {
+
+        timer.textContent =
+            dados.tempo;
+    }
+
+});
+
+// ==========================================
+// VOTAÇÃO
+// ==========================================
+
+socket.on("votacao", dados => {
+
+    faseAtual = "votacao";
+
+    document
+        .getElementById("jogo")
+        .classList.add("hidden");
+
+    document
+        .getElementById("resultadoCategoria")
+        .classList.add("hidden");
+
+    document
+        .getElementById("votacao")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("resultadoFinal")
+        .classList.add("hidden");
+
+    document
+        .getElementById("tituloVotacao")
+        .textContent =
+            `🗳️ Categoria: ${dados.categoria}`;
+
+    document
+        .getElementById("timerVotacao")
+        .textContent =
+            dados.tempo;
+
+    const lista =
+        document.getElementById(
+            "listaRespostas"
+        );
+
+    lista.innerHTML = "";
+
+    dados.respostas.forEach(item => {
+
+        const card =
+            document.createElement("div");
+
+        card.className =
+            "answer-card";
+
+        if (item.jogadorId === meuId) {
+
+            card.classList.add(
+                "my-answer"
+            );
+
+            card.innerHTML = `
+
+                <h3>
+                    ${item.jogadorNome}
+                </h3>
+
+                <div class="answer-text">
+                    ${item.resposta || "(vazio)"}
+                </div>
+
+                <div class="vote-status">
+                    🚫 Esta é sua resposta.
+                    Você não pode votar nela.
+                </div>
+
+            `;
+
+        } else {
+
+            card.innerHTML = `
+
+                <h3>
+                    ${item.jogadorNome}
+                </h3>
+
+                <div class="answer-text">
+                    ${item.resposta || "(vazio)"}
+                </div>
+
+                <div
+                    class="vote-buttons"
+                    id="votos-${item.jogadorId}"
+                >
+
+                    <button
+                        class="btn-correct"
+                        onclick="
+                            votar(
+                                '${item.jogadorId}',
+                                'correta',
+                                this
+                            )
+                        "
+                    >
+                        ✅ Correta
+                    </button>
+
+                    <button
+                        class="btn-wrong"
+                        onclick="
+                            votar(
+                                '${item.jogadorId}',
+                                'errada',
+                                this
+                            )
+                        "
+                    >
+                        ❌ Errada
+                    </button>
+
+                </div>
+
+            `;
+        }
+
+        lista.appendChild(card);
+
+    });
+
+});
+
+// ==========================================
 // VOTAR
-// ==============================================
+// ==========================================
 
 function votar(
     jogadorId,
     voto,
     botao
-){
+) {
 
-    // Já votou nessa resposta?
+    const area =
+        document.getElementById(
+            `votos-${jogadorId}`
+        );
 
-    if(
-        meusVotos[jogadorId]
-    ){
-
+    if (!area) {
         return;
-
     }
-
-
-    // Registra localmente
-
-    meusVotos[jogadorId] =
-        voto;
-
-
-    // Envia para o servidor
-
-    s.emit(
-        "votar",
-        {
-
-            jogadorId,
-
-            voto
-
-        }
-    );
-
-
-    // Desativa SOMENTE os dois
-    // botões dessa resposta
-
-    const container =
-        botao.parentElement;
-
 
     const botoes =
-        container.querySelectorAll(
-            "button"
-        );
+        area.querySelectorAll("button");
 
+    botoes.forEach(b => {
 
-    botoes.forEach(
-        b => {
+        b.disabled = true;
 
-            b.disabled =
-                true;
+    });
 
+    area.innerHTML += `
+
+        <div class="vote-status">
+
+            ${
+                voto === "correta"
+                    ? "✅ Você marcou esta resposta como correta."
+                    : "❌ Você marcou esta resposta como errada."
+            }
+
+        </div>
+
+    `;
+
+    socket.emit(
+        "votar",
+        {
+            jogadorId: jogadorId,
+            voto: voto
         }
     );
-
-
-    // Mostra mensagem
-
-    const mensagem =
-        container
-        .parentElement
-        .querySelector(
-            ".voto-mensagem"
-        );
-
-
-    if(mensagem){
-
-        mensagem.textContent =
-            voto === "correta"
-            ?
-            "✅ Você votou: CORRETA"
-            :
-            "❌ Você votou: ERRADA";
-
-    }
-
-
-    // Destaca o card
-
-    container
-        .parentElement
-        .classList.add(
-            "votou"
-        );
 
 }
 
+// ==========================================
+// VOTO REGISTRADO
+// ==========================================
 
-// ==============================================
-// CONFIRMAÇÃO DO SERVIDOR
-// ==============================================
-
-s.on(
+socket.on(
     "votoRegistrado",
     dados => {
 
-        console.log(
-            "Voto registrado:",
-            dados
-        );
+        // A interface já foi atualizada
+        // imediatamente ao clicar.
 
     }
 );
 
-
-// ==============================================
+// ==========================================
 // RESULTADO DA CATEGORIA
-// ==============================================
+// ==========================================
 
-s.on(
-    "resultadoVotacao",
-    x => {
+socket.on(
+    "resultadoCategoria",
+    dados => {
 
-        votacaoCard.classList.add(
-            "hidden"
-        );
+        document
+            .getElementById("votacao")
+            .classList.add("hidden");
 
-        resultadoVotacaoCard.classList.remove(
-            "hidden"
-        );
+        document
+            .getElementById(
+                "resultadoCategoria"
+            )
+            .classList.remove("hidden");
 
-
-        resultadoVotacao.innerHTML = `
-
-            <h3>
-                ${escapeHTML(
-                    x.categoria
-                )}
-            </h3>
-
-            ${
-                x.resultados
-                .map(r => {
-
-                    let classe = "";
-
-                    let texto = "";
-
-
-                    if(
-                        r.resultado.resultado ===
-                        "correta"
-                    ){
-
-                        classe =
-                            "aprovada";
-
-                        texto =
-                            "✅ APROVADA — +10 pontos";
-
-                    }
-
-                    else if(
-                        r.resultado.resultado ===
-                        "errada"
-                    ){
-
-                        classe =
-                            "reprovada";
-
-                        texto =
-                            "❌ REPROVADA — 0 pontos";
-
-                    }
-
-                    else{
-
-                        classe =
-                            "empate";
-
-                        texto =
-                            "⚖️ EMPATE — 0 pontos";
-
-                    }
-
-
-                    return `
-
-                        <div
-                            class="
-                                votacao-resposta
-                                ${classe}
-                            "
-                        >
-
-                            <div class="nome-jogador">
-
-                                👤
-                                ${escapeHTML(
-                                    r.nome
-                                )}
-
-                            </div>
-
-                            <div class="resposta-texto">
-
-                                ${
-                                    r.resposta
-                                    ?
-                                    escapeHTML(
-                                        r.resposta
-                                    )
-                                    :
-                                    "(sem resposta)"
-                                }
-
-                            </div>
-
-                            <div>
-
-                                ✅
-                                ${r.resultado.corretos}
-                                votos
-
-                                &nbsp;&nbsp;
-
-                                ❌
-                                ${r.resultado.errados}
-                                votos
-
-                            </div>
-
-                            <strong>
-
-                                ${texto}
-
-                            </strong>
-
-                        </div>
-
-                    `;
-
-                })
-                .join("")
-            }
-
-            <p>
-                ⏭️ Próxima categoria em breve...
-            </p>
-
-        `;
-
-    }
-);
-
-
-// ==============================================
-// RESULTADO FINAL
-// ==============================================
-
-s.on(
-    "resultado",
-    x => {
-
-        respostasCard.classList.add(
-            "hidden"
-        );
-
-        votacaoCard.classList.add(
-            "hidden"
-        );
-
-        resultadoVotacaoCard.classList.add(
-            "hidden"
-        );
-
-        res.classList.remove(
-            "hidden"
-        );
-
-
-        const jogadores =
-            [...x].sort(
-                (a,b) =>
-                    b.pontos -
-                    a.pontos
+        const container =
+            document.getElementById(
+                "resultadoCategoriaConteudo"
             );
 
+        container.innerHTML = "";
 
-        res.innerHTML = `
+        dados.resultados.forEach(resultado => {
 
-            <h2>
-                🏆 Resultado Final
-            </h2>
+            const div =
+                document.createElement("div");
 
-            ${
-                jogadores
-                .map(
-                    (p,index) => {
+            div.className =
+                "result-card " +
+                (
+                    resultado.correta
+                        ? "correct"
+                        : "wrong"
+                );
 
-                        let medalha = "";
+            let mensagemPontos = "";
 
-                        if(index === 0)
-                            medalha = "🥇";
+            if (resultado.correta) {
 
-                        if(index === 1)
-                            medalha = "🥈";
+                if (
+                    resultado.quantidadeIguais > 1
+                ) {
 
-                        if(index === 2)
-                            medalha = "🥉";
+                    mensagemPontos = `
+                        <p>
+                            👥
+                            ${resultado.quantidadeIguais}
+                            pessoas deram a mesma resposta.
+                        </p>
 
+                        <p class="score">
+                            10 ÷
+                            ${resultado.quantidadeIguais}
+                            =
+                            ${formatarPontos(
+                                resultado.pontosGanhos
+                            )}
+                            pontos
+                        </p>
+                    `;
 
-                        const classe =
-                            index === 0
-                            ?
-                            "resultado-jogador primeiro"
-                            :
-                            "resultado-jogador";
+                } else {
 
+                    mensagemPontos = `
+                        <p class="score">
+                            +10 pontos
+                        </p>
+                    `;
+                }
 
-                        return `
+            } else {
 
-                            <div
-                                class="${classe}"
-                            >
-
-                                <h3>
-
-                                    ${medalha}
-
-                                    ${index + 1}º
-
-                                    ${escapeHTML(
-                                        p.nome
-                                    )}
-
-                                </h3>
-
-                                <p>
-
-                                    +
-                                    ${p.pontosRodada}
-                                    pontos nesta rodada
-
-                                </p>
-
-                                <strong>
-
-                                    🏆 Total:
-                                    ${p.pontos}
-                                    pontos
-
-                                </strong>
-
-                            </div>
-
-                        `;
-
-                    }
-                )
-                .join("")
-            }
-
-
-            ${
-                dono
-                ?
-                `
-                    <button
-                        onclick="proxima()"
-                    >
-                        🔄 Próxima rodada
-                    </button>
-                `
-                :
-                `
-                    <p>
-                        ⏳ Aguardando o dono...
+                mensagemPontos = `
+                    <p class="score">
+                        +0 pontos
                     </p>
-                `
+                `;
             }
 
-        `;
+            div.innerHTML = `
+
+                <strong>
+                    ${resultado.jogadorNome}
+                </strong>
+
+                <p>
+                    Resposta:
+                    <strong>
+                        ${resultado.resposta || "(vazio)"}
+                    </strong>
+                </p>
+
+                <p>
+                    ${resultado.correta
+                        ? "✅ Resposta aprovada"
+                        : "❌ Resposta reprovada"
+                    }
+                </p>
+
+                <p>
+                    👍 ${resultado.votosCorretos}
+                    &nbsp;&nbsp;
+                    👎 ${resultado.votosErrados}
+                </p>
+
+                ${mensagemPontos}
+
+                <p>
+                    Total:
+                    <strong class="score">
+                        ${formatarPontos(
+                            resultado.pontosTotais
+                        )}
+                    </strong>
+                </p>
+
+            `;
+
+            container.appendChild(div);
+
+        });
 
     }
 );
 
+// ==========================================
+// RESULTADO FINAL
+// ==========================================
 
-// ==============================================
-// AGUARDANDO PRÓXIMA RODADA
-// ==============================================
+socket.on(
+    "resultadoFinal",
+    dados => {
 
-s.on(
-    "aguardando",
-    () => {
+        document
+            .getElementById("jogo")
+            .classList.add("hidden");
 
-        res.classList.add(
-            "hidden"
-        );
+        document
+            .getElementById("votacao")
+            .classList.add("hidden");
 
-        votacaoCard.classList.add(
-            "hidden"
-        );
+        document
+            .getElementById(
+                "resultadoCategoria"
+            )
+            .classList.add("hidden");
 
-        resultadoVotacaoCard.classList.add(
-            "hidden"
-        );
+        document
+            .getElementById("resultadoFinal")
+            .classList.remove("hidden");
 
-        respostasCard.classList.remove(
-            "hidden"
-        );
+        const ranking =
+            document.getElementById(
+                "ranking"
+            );
 
+        ranking.innerHTML = "";
 
-        letra.textContent =
-            "?";
+        dados.ranking.forEach(jogador => {
 
+            const div =
+                document.createElement("div");
 
-        tempo.textContent =
-            "";
+            div.className =
+                "rank-item";
 
+            if (jogador.posicao === 1) {
 
-        cats.innerHTML =
-            "";
+                div.classList.add("rank-1");
+            }
+
+            let medalha = "";
+
+            if (jogador.posicao === 1) {
+                medalha = "🥇";
+            }
+
+            else if (jogador.posicao === 2) {
+                medalha = "🥈";
+            }
+
+            else if (jogador.posicao === 3) {
+                medalha = "🥉";
+            }
+
+            div.innerHTML = `
+
+                ${medalha}
+
+                <strong>
+                    ${jogador.posicao}º
+                    ${jogador.nome}
+                </strong>
+
+                <br>
+
+                <span class="score">
+                    ${formatarPontos(
+                        jogador.pontos
+                    )}
+                    pontos
+                </span>
+
+            `;
+
+            ranking.appendChild(div);
+
+        });
 
     }
 );
 
+// ==========================================
+// FORMATAR PONTOS
+// ==========================================
 
-// ==============================================
-// FUNÇÕES
-// ==============================================
+function formatarPontos(pontos) {
 
-function status(x){
-
-    document.getElementById(
-        "status"
-    ).textContent = x;
-
+    return Number(pontos || 0)
+        .toFixed(2)
+        .replace(".", ",");
 }
 
+// ==========================================
+// VOLTAR PARA SALA
+// ==========================================
 
-function abrir(c){
-
-    codigo.textContent =
-        c;
-
-    menu.classList.add(
-        "hidden"
-    );
-
-    jogo.classList.remove(
-        "hidden"
-    );
-
-}
-
-
-function criar(){
-
-    const nome =
-        nomeInput.value.trim();
-
-
-    if(!nome){
-
-        alert(
-            "Digite seu nome!"
-        );
-
-        return;
-
-    }
-
-
-    s.emit(
-        "criarSala",
-        nome
-    );
-
-}
-
-
-function entrar(){
-
-    const nome =
-        nomeInput.value.trim();
-
-
-    const codin =
-        codigoInput.value
-        .trim()
-        .toUpperCase();
-
-
-    if(!nome){
-
-        alert(
-            "Digite seu nome!"
-        );
-
-        return;
-
-    }
-
-
-    if(!codin){
-
-        alert(
-            "Digite o código!"
-        );
-
-        return;
-
-    }
-
-
-    s.emit(
-        "entrarSala",
-        {
-
-            nome,
-
-            codigo:codin
-
-        }
-    );
-
-}
-
-
-// ==============================================
-// INICIAR
-// ==============================================
-
-function iniciar(){
-
-    s.emit(
-        "iniciar"
-    );
-
-}
-
-
-// ==============================================
-// COLETAR RESPOSTAS
-// ==============================================
-
-function coletarRespostas(){
-
-    const respostas = {};
-
+function voltarSala() {
 
     document
-    .querySelectorAll(
-        "#cats input"
-    )
-    .forEach(
-        input => {
-
-            const categoria =
-                input.id.substring(2);
-
-
-            respostas[
-                categoria
-            ] =
-                input.value.trim();
-
-        }
-    );
-
-
-    return respostas;
-
-}
-
-
-// ==============================================
-// BOTÃO ENVIAR
-// ==============================================
-
-function enviar(){
-
-    const respostas =
-        coletarRespostas();
-
-
-    s.emit(
-        "respostas",
-        respostas
-    );
-
-
-    mostrarMensagem(
-        "📤 Respostas salvas!"
-    );
-
-}
-
-
-// ==============================================
-// STOP
-// ==============================================
-
-function enviarStop(){
-
-    // Primeiro salva absolutamente
-    // tudo que está nos campos
-
-    const respostas =
-        coletarRespostas();
-
-
-    s.emit(
-        "respostas",
-        respostas
-    );
-
-
-    // Depois STOP
-
-    s.emit(
-        "stop"
-    );
-
-}
-
-
-// ==============================================
-// BLOQUEAR CAMPOS
-// ==============================================
-
-function bloquearRespostas(){
+        .getElementById("resultadoFinal")
+        .classList.add("hidden");
 
     document
-    .querySelectorAll(
-        "#cats input"
-    )
-    .forEach(
-        input => {
-
-            input.disabled =
-                true;
-
-        }
-    );
-
-}
-
-
-// ==============================================
-// PRÓXIMA
-// ==============================================
-
-function proxima(){
-
-    s.emit(
-        "proxima"
-    );
-
-}
-
-
-// ==============================================
-// MENSAGEM
-// ==============================================
-
-function mostrarMensagem(
-    texto
-){
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-
-    div.textContent =
-        texto;
-
-
-    div.style.background =
-        "#374151";
-
-    div.style.padding =
-        "15px";
-
-    div.style.borderRadius =
-        "10px";
-
-    div.style.margin =
-        "10px";
-
-
-    document
-    .querySelector("main")
-    .prepend(div);
-
-
-    setTimeout(
-        () => {
-
-            div.remove();
-
-        },
-        2500
-    );
-
-}
-
-
-// ==============================================
-// SEGURANÇA HTML
-// ==============================================
-
-function escapeHTML(texto){
-
-    return String(texto)
-
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-
-        .replace(
-            /</g,
-            "&lt;"
-        )
-
-        .replace(
-            />/g,
-            "&gt;"
-        )
-
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-
-        .replace(
-            /'/g,
-            "&#039;"
-        );
+        .getElementById("sala")
+        .classList.remove("hidden");
 
 }
 
