@@ -6,1546 +6,1048 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
-
 app.use(express.static("public"));
 
+const PORT = process.env.PORT || 3000;
 
-// =====================================================
+// ==========================================
 // CONFIGURAÇÕES
-// =====================================================
+// ==========================================
+
+const TEMPO_RESPOSTAS = 60;
+const TEMPO_VOTACAO = 60;
+const TEMPO_RESULTADO = 4;
 
 const categorias = [
     "Nome",
     "Animal",
     "Objeto",
-    "Comida"
+    "Comida",
+    "Profissão",
+    "CEP",
+    "PCH",
+    "Filme/Série"
 ];
 
-const letras =
-    "ABCDEFGHIJKLMNOPQRSTUV";
-
-const TEMPO_RESPOSTAS = 60;
-const TEMPO_VOTACAO = 60;
+// ==========================================
+// SALAS
+// ==========================================
 
 const salas = {};
 
+// ==========================================
+// FUNÇÕES AUXILIARES
+// ==========================================
 
-// =====================================================
-// FUNÇÕES
-// =====================================================
-
-function gerarCodigo() {
-
+function gerarCodigoSala() {
     let codigo;
 
     do {
-
-        codigo =
-            Math.random()
+        codigo = Math.random()
             .toString(36)
             .substring(2, 6)
             .toUpperCase();
-
     } while (salas[codigo]);
 
     return codigo;
 }
 
+function encontrarSalaDoJogador(socketId) {
+    for (const codigo in salas) {
+        const sala = salas[codigo];
 
-function sortearLetra() {
-
-    return letras[
-        Math.floor(
-            Math.random() * letras.length
-        )
-    ];
-
-}
-
-
-// =====================================================
-// ESTADO DA SALA
-// =====================================================
-
-function enviarEstado(codigo) {
-
-    const sala = salas[codigo];
-
-    if (!sala) return;
-
-    io.to(codigo).emit(
-        "estadoSala",
-        {
-            jogadores:
-                sala.jogadores.map(j => ({
-                    id: j.id,
-                    nome: j.nome,
-                    pontos: j.pontos
-                })),
-
-            iniciada: sala.iniciada,
-
-            fase: sala.fase
+        if (sala.jogadores.some(j => j.id === socketId)) {
+            return sala;
         }
-    );
-}
-
-
-// =====================================================
-// COMEÇAR UMA CATEGORIA DE VOTAÇÃO
-// =====================================================
-
-function iniciarVotacao(codigo) {
-
-    const sala = salas[codigo];
-
-    if (!sala) return;
-
-
-    // Todas as categorias já foram votadas
-
-    if (
-        sala.indiceCategoria >=
-        categorias.length
-    ) {
-
-        finalizarRodada(codigo);
-
-        return;
     }
 
+    return null;
+}
 
-    const categoria =
-        categorias[sala.indiceCategoria];
+function encontrarJogador(sala, socketId) {
+    return sala.jogadores.find(j => j.id === socketId);
+}
 
+function escapeHTML(texto) {
+    if (texto === undefined || texto === null) {
+        return "";
+    }
 
-    sala.fase = "votacao";
+    return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    sala.categoriaAtual =
-        categoria;
+// ==========================================
+// ESTADO DA SALA
+// ==========================================
 
-    sala.tempoVotacao =
-        TEMPO_VOTACAO;
+function enviarEstadoSala(sala) {
 
+    io.to(sala.codigo).emit("estadoSala", {
+        codigo: sala.codigo,
 
-    // Limpa os votos desta categoria
+        jogadores: sala.jogadores.map(j => ({
+            id: j.id,
+            nome: j.nome,
+            pontos: j.pontos
+        })),
+
+        dono: sala.dono
+    });
+}
+
+// ==========================================
+// NOVA RODADA
+// ==========================================
+
+function iniciarRodada(sala) {
+
+    sala.emJogo = true;
+    sala.fase = "respostas";
+
+    sala.letra = gerarLetra();
 
     sala.jogadores.forEach(jogador => {
 
+        jogador.respostas = {};
         jogador.votos = {};
+        jogador.resultados = {};
+        jogador.pontosRodada = 0;
 
+        categorias.forEach(categoria => {
+            jogador.respostas[categoria] = "";
+        });
     });
 
+    sala.tempo = TEMPO_RESPOSTAS;
 
-    // ===============================================
-    // PEGA A RESPOSTA DE CADA JOGADOR
-    // ===============================================
+    io.to(sala.codigo).emit("rodada", {
+        letra: sala.letra,
+        categorias: categorias
+    });
 
-    const respostas =
-        sala.jogadores.map(jogador => ({
+    enviarEstadoSala(sala);
 
-            jogadorId:
-                jogador.id,
-
-            nome:
-                jogador.nome,
-
-            resposta:
-                jogador.respostas[categoria] || ""
-
-        }));
-
-
-    // ===============================================
-    // MANDA TODAS AS RESPOSTAS PARA TODOS
-    // ===============================================
-
-    io.to(codigo).emit(
-        "votacao",
-        {
-
-            categoria,
-
-            numeroCategoria:
-                sala.indiceCategoria + 1,
-
-            totalCategorias:
-                categorias.length,
-
-            respostas,
-
-            tempo:
-                TEMPO_VOTACAO
-
-        }
-    );
-
-
-    // ===============================================
-    // CRIA O TIMER DA VOTAÇÃO
-    // ===============================================
-
-    clearInterval(
-        sala.timerVotacao
-    );
-
-
-    sala.timerVotacao =
-        setInterval(() => {
-
-            if (!salas[codigo]) {
-
-                clearInterval(
-                    sala.timerVotacao
-                );
-
-                return;
-            }
-
-
-            sala.tempoVotacao--;
-
-
-            io.to(codigo).emit(
-                "tempoVotacao",
-                sala.tempoVotacao
-            );
-
-
-            // Acabou o minuto
-
-            if (
-                sala.tempoVotacao <= 0
-            ) {
-
-                clearInterval(
-                    sala.timerVotacao
-                );
-
-                encerrarVotacao(
-                    codigo
-                );
-
-            }
-
-        }, 1000);
-
+    iniciarTimerRespostas(sala);
 }
 
+// ==========================================
+// GERAR LETRA
+// ==========================================
 
-// =====================================================
-// VERIFICAR SE TODOS JÁ VOTARAM
-// =====================================================
+function gerarLetra() {
 
-function todosVotaram(codigo) {
+    const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-    const sala = salas[codigo];
+    return letras[Math.floor(Math.random() * letras.length)];
+}
 
-    if (!sala) return false;
+// ==========================================
+// TIMER DAS RESPOSTAS
+// ==========================================
 
+function iniciarTimerRespostas(sala) {
 
-    for (
-        const resposta of sala.jogadores
-    ) {
+    clearInterval(sala.timer);
 
-        // Se a pessoa não respondeu,
-        // não precisa votar nela.
+    sala.timer = setInterval(() => {
 
-        const texto =
-            resposta.respostas[
-                sala.categoriaAtual
-            ] || "";
+        sala.tempo--;
 
+        io.to(sala.codigo).emit("tempo", {
+            tempo: sala.tempo,
+            fase: "respostas"
+        });
 
-        if (!texto.trim()) {
+        if (sala.tempo <= 0) {
 
-            continue;
+            clearInterval(sala.timer);
 
+            iniciarVotacao(sala);
         }
 
+    }, 1000);
+}
 
-        // Todos os outros jogadores
-        // precisam votar nessa resposta
+// ==========================================
+// STOP
+// ==========================================
 
-        for (
-            const votante of sala.jogadores
-        ) {
+function pararRodada(sala, socketId) {
 
-            // Não vota na própria resposta
-
-            if (
-                votante.id ===
-                resposta.id
-            ) {
-
-                continue;
-
-            }
-
-
-            if (
-                !resposta.votos[
-                    votante.id
-                ]
-            ) {
-
-                return false;
-
-            }
-
-        }
-
+    if (!sala.emJogo) {
+        return;
     }
 
+    if (sala.fase !== "respostas") {
+        return;
+    }
 
-    return true;
+    clearInterval(sala.timer);
+
+    sala.fase = "votacao";
+
+    io.to(sala.codigo).emit("stop");
+
+    iniciarVotacao(sala);
 }
 
+// ==========================================
+// VOTAÇÃO
+// ==========================================
 
-// =====================================================
-// ENCERRAR VOTAÇÃO
-// =====================================================
+function iniciarVotacao(sala) {
 
-function encerrarVotacao(codigo) {
+    sala.fase = "votacao";
 
-    const sala = salas[codigo];
+    sala.categoriaAtual = 0;
 
-    if (!sala) return;
+    iniciarCategoriaVotacao(sala);
+}
 
+// ==========================================
+// INICIAR CATEGORIA DA VOTAÇÃO
+// ==========================================
 
-    if (
-        sala.fase !== "votacao"
-    ) {
+function iniciarCategoriaVotacao(sala) {
+
+    if (sala.categoriaAtual >= categorias.length) {
+
+        finalizarRodada(sala);
 
         return;
-
     }
 
+    const categoria = categorias[sala.categoriaAtual];
 
-    clearInterval(
-        sala.timerVotacao
-    );
+    sala.categoriaVotacao = categoria;
 
+    sala.jogadores.forEach(jogador => {
 
-    const categoria =
-        sala.categoriaAtual;
-
-
-    // ===============================================
-    // CALCULA OS VOTOS
-    // ===============================================
-
-    sala.jogadores.forEach(
-        jogadorResposta => {
-
-            const resposta =
-                jogadorResposta
-                .respostas[categoria] || "";
-
-
-            let corretos = 0;
-
-            let errados = 0;
-
-
-            Object.values(
-                jogadorResposta.votos || {}
-            ).forEach(voto => {
-
-                if (
-                    voto === "correta"
-                ) {
-
-                    corretos++;
-
-                }
-
-                if (
-                    voto === "errada"
-                ) {
-
-                    errados++;
-
-                }
-
-            });
-
-
-            let resultado =
-                "empate";
-
-
-            // Maioria aprovou
-
-            if (
-                corretos > errados
-            ) {
-
-                resultado =
-                    "correta";
-
-
-                jogadorResposta.pontos += 10;
-
-
-                jogadorResposta.pontosRodada =
-                    (
-                        jogadorResposta
-                        .pontosRodada || 0
-                    ) + 10;
-
-            }
-
-
-            // Maioria rejeitou
-
-            else if (
-                errados > corretos
-            ) {
-
-                resultado =
-                    "errada";
-
-            }
-
-
-            jogadorResposta.resultados =
-                jogadorResposta.resultados || {};
-
-
-            jogadorResposta.resultados[
-                categoria
-            ] = {
-
-                resposta,
-
-                corretos,
-
-                errados,
-
-                resultado
-
-            };
-
+        if (!jogador.votos) {
+            jogador.votos = {};
         }
+
+        if (!jogador.votos[categoria]) {
+            jogador.votos[categoria] = {};
+        }
+    });
+
+    const respostas = sala.jogadores.map(jogador => {
+
+        return {
+            jogadorId: jogador.id,
+            jogadorNome: jogador.nome,
+            resposta: jogador.respostas[categoria] || "",
+            votos: {}
+        };
+    });
+
+    sala.respostasVotacao = respostas;
+
+    sala.tempo = TEMPO_VOTACAO;
+
+    io.to(sala.codigo).emit("votacao", {
+
+        categoria: categoria,
+
+        respostas: respostas.map(item => ({
+            jogadorId: item.jogadorId,
+            jogadorNome: escapeHTML(item.jogadorNome),
+            resposta: escapeHTML(item.resposta)
+        })),
+
+        tempo: TEMPO_VOTACAO
+    });
+
+    iniciarTimerVotacao(sala);
+}
+
+// ==========================================
+// TIMER DA VOTAÇÃO
+// ==========================================
+
+function iniciarTimerVotacao(sala) {
+
+    clearInterval(sala.timer);
+
+    sala.timer = setInterval(() => {
+
+        sala.tempo--;
+
+        io.to(sala.codigo).emit("tempo", {
+            tempo: sala.tempo,
+            fase: "votacao"
+        });
+
+        if (sala.tempo <= 0) {
+
+            clearInterval(sala.timer);
+
+            finalizarCategoriaVotacao(sala);
+        }
+
+    }, 1000);
+}
+
+// ==========================================
+// VOTAR
+// ==========================================
+
+function votar(sala, socketId, jogadorAvaliadoId, voto) {
+
+    if (sala.fase !== "votacao") {
+        return;
+    }
+
+    const categoria = sala.categoriaVotacao;
+
+    const jogador = encontrarJogador(sala, socketId);
+
+    if (!jogador) {
+        return;
+    }
+
+    // ======================================
+    // NÃO PODE VOTAR NA PRÓPRIA RESPOSTA
+    // ======================================
+
+    if (socketId === jogadorAvaliadoId) {
+
+        io.to(socketId).emit("erro", "Você não pode votar na sua própria resposta.");
+
+        return;
+    }
+
+    // ======================================
+    // VERIFICAR RESPOSTA
+    // ======================================
+
+    const respostaAvaliada = sala.respostasVotacao.find(
+        item => item.jogadorId === jogadorAvaliadoId
     );
 
+    if (!respostaAvaliada) {
+        return;
+    }
 
-    // ===============================================
-    // MANDA RESULTADO DA CATEGORIA
-    // ===============================================
+    // ======================================
+    // EVITAR VOTO DUPLICADO
+    // ======================================
 
-    const resultados =
-        sala.jogadores.map(
-            jogador => ({
+    if (!respostaAvaliada.votos) {
+        respostaAvaliada.votos = {};
+    }
 
-                jogadorId:
-                    jogador.id,
+    if (respostaAvaliada.votos[socketId]) {
 
-                nome:
-                    jogador.nome,
-
-                resposta:
-                    jogador.respostas[
-                        categoria
-                    ] || "",
-
-                resultado:
-                    jogador.resultados[
-                        categoria
-                    ]
-
-            })
+        io.to(socketId).emit(
+            "erro",
+            "Você já votou nessa resposta."
         );
 
+        return;
+    }
 
-    io.to(codigo).emit(
-        "resultadoVotacao",
-        {
+    // ======================================
+    // VALIDAR VOTO
+    // ======================================
 
-            categoria,
+    if (voto !== "correta" && voto !== "errada") {
+        return;
+    }
 
-            resultados
+    respostaAvaliada.votos[socketId] = voto;
 
+    // ======================================
+    // AVISAR O JOGADOR QUE ELE VOTOU
+    // ======================================
+
+    io.to(socketId).emit("votoRegistrado", {
+        jogadorId: jogadorAvaliadoId,
+        voto: voto
+    });
+
+    // ======================================
+    // ATUALIZAR A SALA
+    // ======================================
+
+    verificarTodosVotaram(sala);
+}
+
+// ==========================================
+// VERIFICAR SE TODOS OS VOTOS POSSÍVEIS
+// FORAM FEITOS
+// ==========================================
+
+function verificarTodosVotaram(sala) {
+
+    let tudoAvaliado = true;
+
+    for (const resposta of sala.respostasVotacao) {
+
+        const jogadorDaResposta = encontrarJogador(
+            sala,
+            resposta.jogadorId
+        );
+
+        if (!jogadorDaResposta) {
+            continue;
         }
-    );
 
+        // Quantidade de pessoas que podem votar
+        const quantidadeVotantes =
+            sala.jogadores.length - 1;
 
-    // ===============================================
+        const quantidadeVotos =
+            Object.keys(resposta.votos || {}).length;
+
+        if (quantidadeVotos < quantidadeVotantes) {
+
+            tudoAvaliado = false;
+
+            break;
+        }
+    }
+
+    if (tudoAvaliado) {
+
+        clearInterval(sala.timer);
+
+        finalizarCategoriaVotacao(sala);
+    }
+}
+
+// ==========================================
+// FINALIZAR VOTAÇÃO DA CATEGORIA
+// ==========================================
+
+function finalizarCategoriaVotacao(sala) {
+
+    if (sala.fase !== "votacao") {
+        return;
+    }
+
+    clearInterval(sala.timer);
+
+    const categoria = sala.categoriaVotacao;
+
+    // ======================================
+    // CALCULAR RESULTADOS
+    // ======================================
+
+    const aprovadas = [];
+
+    sala.respostasVotacao.forEach(resposta => {
+
+        const jogador = encontrarJogador(
+            sala,
+            resposta.jogadorId
+        );
+
+        if (!jogador) {
+            return;
+        }
+
+        const votos = Object.values(
+            resposta.votos || {}
+        );
+
+        const corretos = votos.filter(
+            voto => voto === "correta"
+        ).length;
+
+        const errados = votos.filter(
+            voto => voto === "errada"
+        ).length;
+
+        let aprovada = false;
+
+        // Maioria precisa considerar correta
+        if (corretos > errados) {
+            aprovada = true;
+        }
+
+        // ==================================
+        // RESPOSTA VAZIA NÃO GANHA PONTOS
+        // ==================================
+
+        if (!resposta.resposta || resposta.resposta.trim() === "") {
+            aprovada = false;
+        }
+
+        if (aprovada) {
+
+            aprovadas.push({
+                jogadorId: jogador.id,
+                resposta: resposta.resposta.trim().toLowerCase()
+            });
+        }
+
+        jogador.resultados[categoria] = {
+            correta: aprovada,
+            votosCorretos: corretos,
+            votosErrados: errados
+        };
+    });
+
+    // ======================================
+    // CONTAR RESPOSTAS IGUAIS
+    // ======================================
+
+    const quantidadePorResposta = {};
+
+    aprovadas.forEach(item => {
+
+        const respostaNormalizada = normalizarResposta(
+            item.resposta
+        );
+
+        if (!quantidadePorResposta[respostaNormalizada]) {
+            quantidadePorResposta[respostaNormalizada] = 0;
+        }
+
+        quantidadePorResposta[respostaNormalizada]++;
+    });
+
+    // ======================================
+    // DAR PONTOS
+    // ======================================
+
+    sala.jogadores.forEach(jogador => {
+
+        const resultado = jogador.resultados[categoria];
+
+        if (!resultado || !resultado.correta) {
+            return;
+        }
+
+        const resposta = normalizarResposta(
+            jogador.respostas[categoria]
+        );
+
+        const quantidade =
+            quantidadePorResposta[resposta] || 1;
+
+        const pontos = 10 / quantidade;
+
+        jogador.pontosRodada += pontos;
+        jogador.pontos += pontos;
+    });
+
+    // ======================================
+    // ENVIAR RESULTADO
+    // ======================================
+
+    io.to(sala.codigo).emit("resultadoCategoria", {
+
+        categoria: categoria,
+
+        resultados: sala.jogadores.map(jogador => {
+
+            const resultado =
+                jogador.resultados[categoria] || {};
+
+            const resposta =
+                jogador.respostas[categoria] || "";
+
+            let quantidadeIguais = 0;
+
+            if (resultado.correta) {
+
+                quantidadeIguais =
+                    quantidadePorResposta[
+                        normalizarResposta(resposta)
+                    ] || 1;
+            }
+
+            const pontosGanhos =
+                resultado.correta
+                    ? 10 / quantidadeIguais
+                    : 0;
+
+            return {
+
+                jogadorId: jogador.id,
+
+                jogadorNome:
+                    escapeHTML(jogador.nome),
+
+                resposta:
+                    escapeHTML(resposta),
+
+                correta:
+                    resultado.correta || false,
+
+                votosCorretos:
+                    resultado.votosCorretos || 0,
+
+                votosErrados:
+                    resultado.votosErrados || 0,
+
+                quantidadeIguais:
+                    quantidadeIguais,
+
+                pontosGanhos:
+                    pontosGanhos,
+
+                pontosTotais:
+                    jogador.pontos
+            };
+        })
+    });
+
+    enviarEstadoSala(sala);
+
+    // ======================================
     // PRÓXIMA CATEGORIA
-    // ===============================================
+    // ======================================
+
+    sala.categoriaAtual++;
 
     setTimeout(() => {
 
-        if (!salas[codigo])
-            return;
-
-
-        sala.indiceCategoria++;
-
-
-        if (
-            sala.indiceCategoria >=
-            categorias.length
-        ) {
-
-            finalizarRodada(
-                codigo
-            );
-
+        if (sala.emJogo) {
+            iniciarCategoriaVotacao(sala);
         }
 
-        else {
-
-            iniciarVotacao(
-                codigo
-            );
-
-        }
-
-    }, 4000);
-
+    }, TEMPO_RESULTADO * 1000);
 }
 
+// ==========================================
+// NORMALIZAR RESPOSTA
+// ==========================================
 
-// =====================================================
-// RESULTADO FINAL
-// =====================================================
+function normalizarResposta(resposta) {
 
-function finalizarRodada(codigo) {
-
-    const sala = salas[codigo];
-
-    if (!sala) return;
-
-
-    clearInterval(
-        sala.timer
-    );
-
-    clearInterval(
-        sala.timerVotacao
-    );
-
-
-    sala.fase =
-        "resultado";
-
-
-    const resultado =
-        sala.jogadores.map(
-            jogador => ({
-
-                nome:
-                    jogador.nome,
-
-                pontosRodada:
-                    jogador.pontosRodada || 0,
-
-                pontos:
-                    jogador.pontos
-
-            })
-        );
-
-
-    io.to(codigo).emit(
-        "resultado",
-        resultado
-    );
-
-
-    enviarEstado(codigo);
-
+    return String(resposta || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ");
 }
 
+// ==========================================
+// FINALIZAR RODADA
+// ==========================================
 
-// =====================================================
+function finalizarRodada(sala) {
+
+    clearInterval(sala.timer);
+
+    sala.fase = "final";
+    sala.emJogo = false;
+
+    const ranking = [...sala.jogadores]
+        .sort((a, b) => b.pontos - a.pontos)
+        .map((jogador, index) => {
+
+            return {
+                posicao: index + 1,
+                id: jogador.id,
+                nome: jogador.nome,
+                pontos: jogador.pontos
+            };
+        });
+
+    io.to(sala.codigo).emit("resultadoFinal", {
+        ranking: ranking
+    });
+
+    enviarEstadoSala(sala);
+}
+
+// ==========================================
 // SOCKET.IO
-// =====================================================
+// ==========================================
 
-io.on(
-    "connection",
-    socket => {
+io.on("connection", socket => {
+
+    console.log("Jogador conectado:", socket.id);
+
+    // ======================================
+    // CRIAR SALA
+    // ======================================
+
+    socket.on("criarSala", nome => {
+
+        if (!nome || !nome.trim()) {
+            socket.emit("erro", "Digite seu nome.");
+
+            return;
+        }
+
+        const codigo = gerarCodigoSala();
+
+        salas[codigo] = {
+
+            codigo: codigo,
+
+            dono: socket.id,
+
+            jogadores: [],
+
+            emJogo: false,
+
+            fase: "aguardando",
+
+            letra: "",
+
+            categoriaAtual: 0,
+
+            categoriaVotacao: "",
+
+            respostasVotacao: [],
+
+            timer: null,
+
+            tempo: 0
+        };
+
+        const jogador = {
+
+            id: socket.id,
+
+            nome: nome.trim(),
+
+            pontos: 0,
+
+            pontosRodada: 0,
+
+            respostas: {},
+
+            votos: {},
+
+            resultados: {}
+        };
+
+        salas[codigo].jogadores.push(jogador);
+
+        socket.join(codigo);
+
+        socket.emit("salaCriada", {
+            codigo: codigo
+        });
+
+        enviarEstadoSala(salas[codigo]);
+    });
+
+    // ======================================
+    // ENTRAR NA SALA
+    // ======================================
+
+    socket.on("entrarSala", dados => {
+
+        const nome = dados.nome;
+        const codigo = String(dados.codigo || "")
+            .trim()
+            .toUpperCase();
+
+        if (!nome || !nome.trim()) {
+
+            socket.emit(
+                "erro",
+                "Digite seu nome."
+            );
+
+            return;
+        }
+
+        const sala = salas[codigo];
+
+        if (!sala) {
+
+            socket.emit(
+                "erro",
+                "Sala não encontrada."
+            );
+
+            return;
+        }
+
+        if (sala.emJogo) {
+
+            socket.emit(
+                "erro",
+                "A partida já começou."
+            );
+
+            return;
+        }
+
+        const jogador = {
+
+            id: socket.id,
+
+            nome: nome.trim(),
+
+            pontos: 0,
+
+            pontosRodada: 0,
+
+            respostas: {},
+
+            votos: {},
+
+            resultados: {}
+        };
+
+        sala.jogadores.push(jogador);
+
+        socket.join(codigo);
+
+        socket.emit("entrouSala", {
+            codigo: codigo
+        });
+
+        enviarEstadoSala(sala);
+    });
+
+    // ======================================
+    // INICIAR
+    // ======================================
+
+    socket.on("iniciar", () => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        if (sala.dono !== socket.id) {
+
+            socket.emit(
+                "erro",
+                "Somente o dono da sala pode iniciar."
+            );
+
+            return;
+        }
+
+        if (sala.jogadores.length < 1) {
+
+            socket.emit(
+                "erro",
+                "Não há jogadores suficientes."
+            );
+
+            return;
+        }
+
+        if (sala.emJogo) {
+            return;
+        }
+
+        iniciarRodada(sala);
+    });
+
+    // ======================================
+    // SALVAR UMA RESPOSTA
+    // ======================================
+
+    socket.on("respostaDigitada", dados => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        if (sala.fase !== "respostas") {
+            return;
+        }
+
+        const jogador =
+            encontrarJogador(sala, socket.id);
+
+        if (!jogador) {
+            return;
+        }
+
+        const categoria = dados.categoria;
+        const resposta = dados.resposta;
+
+        if (!categorias.includes(categoria)) {
+            return;
+        }
+
+        jogador.respostas[categoria] =
+            String(resposta || "").trim();
+    });
+
+    // ======================================
+    // ENVIAR TODAS AS RESPOSTAS
+    // ======================================
+
+    socket.on("respostas", respostas => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        if (sala.fase !== "respostas") {
+            return;
+        }
+
+        const jogador =
+            encontrarJogador(sala, socket.id);
+
+        if (!jogador) {
+            return;
+        }
+
+        categorias.forEach(categoria => {
+
+            if (
+                respostas &&
+                respostas[categoria] !== undefined
+            ) {
+
+                jogador.respostas[categoria] =
+                    String(
+                        respostas[categoria] || ""
+                    ).trim();
+            }
+        });
+    });
+
+    // ======================================
+    // STOP
+    // ======================================
+
+    socket.on("stop", () => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        pararRodada(sala, socket.id);
+    });
+
+    // ======================================
+    // VOTAR
+    // ======================================
+
+    socket.on("votar", dados => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        votar(
+            sala,
+            socket.id,
+            dados.jogadorId,
+            dados.voto
+        );
+    });
+
+    // ======================================
+    // PRÓXIMA
+    // ======================================
+
+    socket.on("proxima", () => {
+
+        const sala =
+            encontrarSalaDoJogador(socket.id);
+
+        if (!sala) {
+            return;
+        }
+
+        if (sala.fase !== "votacao") {
+            return;
+        }
+
+        clearInterval(sala.timer);
+
+        finalizarCategoriaVotacao(sala);
+    });
+
+    // ======================================
+    // DESCONECTAR
+    // ======================================
+
+    socket.on("disconnect", () => {
 
         console.log(
-            "Jogador conectado:",
+            "Jogador desconectado:",
             socket.id
         );
 
+        const sala =
+            encontrarSalaDoJogador(socket.id);
 
-        // =============================================
-        // CRIAR SALA
-        // =============================================
+        if (!sala) {
+            return;
+        }
 
-        socket.on(
-            "criarSala",
-            nome => {
+        sala.jogadores =
+            sala.jogadores.filter(
+                jogador => jogador.id !== socket.id
+            );
 
-                nome =
-                    String(
-                        nome || ""
-                    ).trim();
+        // Se era o dono, escolher outro
+        if (sala.dono === socket.id) {
 
+            if (sala.jogadores.length > 0) {
 
-                if (!nome) {
+                sala.dono =
+                    sala.jogadores[0].id;
 
-                    socket.emit(
-                        "erro",
-                        "Digite seu nome."
-                    );
-
-                    return;
-                }
-
-
-                const codigo =
-                    gerarCodigo();
-
-
-                salas[codigo] = {
-
-                    dono:
-                        socket.id,
-
-                    jogadores: [
-
-                        {
-
-                            id:
-                                socket.id,
-
-                            nome,
-
-                            pontos: 0,
-
-                            pontosRodada: 0,
-
-                            respostas: {},
-
-                            votos: {},
-
-                            resultados: {}
-
-                        }
-
-                    ],
-
-
-                    iniciada:
-                        false,
-
-                    fase:
-                        "esperando",
-
-                    letra:
-                        null,
-
-                    tempo:
-                        TEMPO_RESPOSTAS,
-
-                    timer:
-                        null,
-
-                    timerVotacao:
-                        null,
-
-                    tempoVotacao:
-                        TEMPO_VOTACAO,
-
-                    indiceCategoria:
-                        0,
-
-                    categoriaAtual:
-                        null,
-
-                    stopPor:
-                        null
-
-                };
-
-
-                socket.join(codigo);
-
-                socket.sala =
-                    codigo;
-
-
-                socket.emit(
-                    "salaCriada",
-                    codigo
+                io.to(sala.codigo).emit(
+                    "novoDono",
+                    sala.dono
                 );
 
+            } else {
 
-                enviarEstado(
-                    codigo
-                );
+                clearInterval(sala.timer);
 
+                delete salas[sala.codigo];
+
+                return;
             }
-        );
+        }
 
+        // Se a sala ficou sem jogadores
+        if (sala.jogadores.length === 0) {
 
-        // =============================================
-        // ENTRAR NA SALA
-        // =============================================
+            clearInterval(sala.timer);
 
-        socket.on(
-            "entrarSala",
-            dados => {
+            delete salas[sala.codigo];
 
-                const nome =
-                    String(
-                        dados?.nome || ""
-                    ).trim();
+            return;
+        }
 
+        enviarEstadoSala(sala);
+    });
+});
 
-                const codigo =
-                    String(
-                        dados?.codigo || ""
-                    )
-                    .trim()
-                    .toUpperCase();
-
-
-                if (!nome) {
-
-                    socket.emit(
-                        "erro",
-                        "Digite seu nome."
-                    );
-
-                    return;
-                }
-
-
-                if (!salas[codigo]) {
-
-                    socket.emit(
-                        "erro",
-                        "Sala não encontrada."
-                    );
-
-                    return;
-                }
-
-
-                const sala =
-                    salas[codigo];
-
-
-                if (sala.iniciada) {
-
-                    socket.emit(
-                        "erro",
-                        "Essa rodada já começou."
-                    );
-
-                    return;
-                }
-
-
-                if (
-                    sala.jogadores.some(
-                        j =>
-                            j.nome
-                            .toLowerCase() ===
-                            nome.toLowerCase()
-                    )
-                ) {
-
-                    socket.emit(
-                        "erro",
-                        "Esse nome já está sendo usado."
-                    );
-
-                    return;
-                }
-
-
-                sala.jogadores.push({
-
-                    id:
-                        socket.id,
-
-                    nome,
-
-                    pontos: 0,
-
-                    pontosRodada: 0,
-
-                    respostas: {},
-
-                    votos: {},
-
-                    resultados: {}
-
-                });
-
-
-                socket.join(codigo);
-
-                socket.sala =
-                    codigo;
-
-
-                socket.emit(
-                    "entrouSala",
-                    codigo
-                );
-
-
-                enviarEstado(
-                    codigo
-                );
-
-            }
-        );
-
-
-        // =============================================
-        // INICIAR RODADA
-        // =============================================
-
-        socket.on(
-            "iniciar",
-            () => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala) return;
-
-
-                if (
-                    sala.dono !==
-                    socket.id
-                ) {
-
-                    socket.emit(
-                        "erro",
-                        "Somente o dono pode iniciar."
-                    );
-
-                    return;
-                }
-
-
-                if (
-                    sala.iniciada
-                ) {
-
-                    return;
-
-                }
-
-
-                sala.iniciada =
-                    true;
-
-                sala.fase =
-                    "respondendo";
-
-
-                sala.letra =
-                    sortearLetra();
-
-
-                sala.tempo =
-                    TEMPO_RESPOSTAS;
-
-
-                sala.stopPor =
-                    null;
-
-
-                sala.indiceCategoria =
-                    0;
-
-
-                sala.categoriaAtual =
-                    null;
-
-
-                sala.jogadores.forEach(
-                    jogador => {
-
-                        jogador.pontosRodada =
-                            0;
-
-                        jogador.respostas =
-                            {};
-
-                        jogador.votos =
-                            {};
-
-                        jogador.resultados =
-                            {};
-
-                    }
-                );
-
-
-                io.to(codigo).emit(
-                    "rodada",
-                    {
-
-                        letra:
-                            sala.letra,
-
-                        tempo:
-                            TEMPO_RESPOSTAS,
-
-                        categorias
-
-                    }
-                );
-
-
-                enviarEstado(
-                    codigo
-                );
-
-
-                clearInterval(
-                    sala.timer
-                );
-
-
-                sala.timer =
-                    setInterval(() => {
-
-                        sala.tempo--;
-
-
-                        io.to(codigo).emit(
-                            "tempo",
-                            sala.tempo
-                        );
-
-
-                        if (
-                            sala.tempo <= 0
-                        ) {
-
-                            clearInterval(
-                                sala.timer
-                            );
-
-
-                            sala.fase =
-                                "votacao";
-
-
-                            sala.indiceCategoria =
-                                0;
-
-
-                            io.to(codigo).emit(
-                                "tempoAcabou"
-                            );
-
-
-                            iniciarVotacao(
-                                codigo
-                            );
-
-                        }
-
-                    }, 1000);
-
-            }
-        );
-
-
-        // =============================================
-        // SALVAR UMA RESPOSTA INDIVIDUAL
-        // =============================================
-
-        socket.on(
-            "respostaDigitada",
-            dados => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala)
-                    return;
-
-
-                if (
-                    sala.fase !==
-                    "respondendo"
-                ) {
-
-                    return;
-
-                }
-
-
-                const jogador =
-                    sala.jogadores.find(
-                        j =>
-                            j.id ===
-                            socket.id
-                    );
-
-
-                if (!jogador)
-                    return;
-
-
-                const categoria =
-                    dados?.categoria;
-
-
-                const resposta =
-                    String(
-                        dados?.resposta || ""
-                    ).trim();
-
-
-                // Só aceita categorias existentes
-
-                if (
-                    !categorias.includes(
-                        categoria
-                    )
-                ) {
-
-                    return;
-
-                }
-
-
-                // Salva individualmente
-
-                jogador.respostas[
-                    categoria
-                ] = resposta;
-
-            }
-        );
-
-
-        // =============================================
-        // SALVAR TODAS AS RESPOSTAS
-        // =============================================
-
-        socket.on(
-            "respostas",
-            respostas => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala)
-                    return;
-
-
-                if (
-                    sala.fase !==
-                    "respondendo"
-                ) {
-
-                    return;
-
-                }
-
-
-                const jogador =
-                    sala.jogadores.find(
-                        j =>
-                            j.id ===
-                            socket.id
-                    );
-
-
-                if (!jogador)
-                    return;
-
-
-                categorias.forEach(
-                    categoria => {
-
-                        if (
-                            respostas &&
-                            typeof
-                            respostas[
-                                categoria
-                            ] ===
-                            "string"
-                        ) {
-
-                            jogador.respostas[
-                                categoria
-                            ] =
-                                respostas[
-                                    categoria
-                                ].trim();
-
-                        }
-
-                    }
-                );
-
-            }
-        );
-
-
-        // =============================================
-        // STOP
-        // =============================================
-
-        socket.on(
-            "stop",
-            () => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala)
-                    return;
-
-
-                if (
-                    sala.fase !==
-                    "respondendo"
-                ) {
-
-                    return;
-
-                }
-
-
-                // Primeiro STOP
-
-                if (
-                    sala.stopPor
-                ) {
-
-                    return;
-
-                }
-
-
-                sala.stopPor =
-                    socket.id;
-
-
-                clearInterval(
-                    sala.timer
-                );
-
-
-                sala.fase =
-                    "votacao";
-
-
-                sala.indiceCategoria =
-                    0;
-
-
-                io.to(codigo).emit(
-                    "stop",
-                    {
-
-                        jogadorId:
-                            socket.id
-
-                    }
-                );
-
-
-                setTimeout(() => {
-
-                    if (
-                        !salas[codigo]
-                    )
-                        return;
-
-
-                    iniciarVotacao(
-                        codigo
-                    );
-
-                }, 1000);
-
-            }
-        );
-
-
-        // =============================================
-        // VOTAR
-        // =============================================
-
-        socket.on(
-            "votar",
-            dados => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala)
-                    return;
-
-
-                if (
-                    sala.fase !==
-                    "votacao"
-                ) {
-
-                    return;
-
-                }
-
-
-                const votante =
-                    sala.jogadores.find(
-                        j =>
-                            j.id ===
-                            socket.id
-                    );
-
-
-                if (!votante)
-                    return;
-
-
-                const avaliado =
-                    sala.jogadores.find(
-                        j =>
-                            j.id ===
-                            dados?.jogadorId
-                    );
-
-
-                if (!avaliado)
-                    return;
-
-
-                // ========================================
-                // NÃO PODE VOTAR NA PRÓPRIA RESPOSTA
-                // ========================================
-
-                if (
-                    avaliado.id ===
-                    socket.id
-                ) {
-
-                    socket.emit(
-                        "erro",
-                        "Você não pode votar na própria resposta."
-                    );
-
-                    return;
-
-                }
-
-
-                if (
-                    dados.voto !==
-                    "correta" &&
-                    dados.voto !==
-                    "errada"
-                ) {
-
-                    return;
-
-                }
-
-
-                avaliado.votos =
-                    avaliado.votos || {};
-
-
-                // ========================================
-                // NÃO PODE VOTAR DUAS VEZES
-                // NA MESMA RESPOSTA
-                // ========================================
-
-                if (
-                    avaliado.votos[
-                        socket.id
-                    ]
-                ) {
-
-                    return;
-
-                }
-
-
-                // Registra o voto
-
-                avaliado.votos[
-                    socket.id
-                ] =
-                    dados.voto;
-
-
-                // ========================================
-                // AVISA SOMENTE O JOGADOR QUE VOTOU
-                // ========================================
-
-                socket.emit(
-                    "votoRegistrado",
-                    {
-
-                        jogadorId:
-                            avaliado.id,
-
-                        voto:
-                            dados.voto
-
-                    }
-                );
-
-
-                // ========================================
-                // TODOS JÁ VOTARAM?
-                // ========================================
-
-                if (
-                    todosVotaram(
-                        codigo
-                    )
-                ) {
-
-                    clearInterval(
-                        sala.timerVotacao
-                    );
-
-
-                    encerrarVotacao(
-                        codigo
-                    );
-
-                }
-
-            }
-        );
-
-
-        // =============================================
-        // PRÓXIMA RODADA
-        // =============================================
-
-        socket.on(
-            "proxima",
-            () => {
-
-                const codigo =
-                    socket.sala;
-
-                const sala =
-                    salas[codigo];
-
-
-                if (!sala)
-                    return;
-
-
-                if (
-                    sala.dono !==
-                    socket.id
-                ) {
-
-                    socket.emit(
-                        "erro",
-                        "Somente o dono pode iniciar a próxima rodada."
-                    );
-
-                    return;
-
-                }
-
-
-                if (
-                    sala.fase !==
-                    "resultado"
-                ) {
-
-                    return;
-
-                }
-
-
-                sala.iniciada =
-                    false;
-
-                sala.fase =
-                    "esperando";
-
-
-                sala.letra =
-                    null;
-
-
-                sala.tempo =
-                    TEMPO_RESPOSTAS;
-
-
-                sala.stopPor =
-                    null;
-
-
-                sala.indiceCategoria =
-                    0;
-
-
-                sala.categoriaAtual =
-                    null;
-
-
-                sala.jogadores.forEach(
-                    jogador => {
-
-                        jogador.respostas =
-                            {};
-
-                        jogador.votos =
-                            {};
-
-                        jogador.resultados =
-                            {};
-
-                        jogador.pontosRodada =
-                            0;
-
-                    }
-                );
-
-
-                enviarEstado(
-                    codigo
-                );
-
-
-                io.to(codigo).emit(
-                    "aguardando"
-                );
-
-            }
-        );
-
-
-        // =============================================
-        // DESCONECTAR
-        // =============================================
-
-        socket.on(
-            "disconnect",
-            () => {
-
-                const codigo =
-                    socket.sala;
-
-
-                if (
-                    !codigo ||
-                    !salas[codigo]
-                ) {
-
-                    return;
-
-                }
-
-
-                const sala =
-                    salas[codigo];
-
-
-                sala.jogadores =
-                    sala.jogadores.filter(
-                        j =>
-                            j.id !==
-                            socket.id
-                    );
-
-
-                if (
-                    sala.dono ===
-                    socket.id
-                ) {
-
-                    if (
-                        sala.jogadores.length >
-                        0
-                    ) {
-
-                        sala.dono =
-                            sala.jogadores[0].id;
-
-
-                        io.to(codigo).emit(
-                            "novoDono",
-                            sala.dono
-                        );
-
-                    }
-
-                    else {
-
-                        clearInterval(
-                            sala.timer
-                        );
-
-                        clearInterval(
-                            sala.timerVotacao
-                        );
-
-
-                        delete salas[codigo];
-
-                        return;
-
-                    }
-
-                }
-
-
-                enviarEstado(
-                    codigo
-                );
-
-            }
-        );
-
-    }
-);
-
-
-// =====================================================
+// ==========================================
 // SERVIDOR
-// =====================================================
+// ==========================================
 
-server.listen(
-    PORT,
-    () => {
+server.listen(PORT, () => {
 
-        console.log(
-            `Servidor rodando na porta ${PORT}`
-        );
-
-    }
-);
+    console.log(
+        `Servidor rodando na porta ${PORT}`
+    );
+});
