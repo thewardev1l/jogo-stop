@@ -1,7 +1,7 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STOP Multiplayer</title><style>
 body{font-family:Arial;background:#111827;color:#fff;text-align:center;margin:0;padding:25px}main{max-width:800px;margin:auto}.card{background:#1f2937;padding:25px;border-radius:18px;margin:15px 0}input,button{padding:13px;margin:6px;border-radius:10px;border:0;font-size:16px}input{width:85%}button{background:#22c55e;font-weight:bold;cursor:pointer}.danger{background:#ef4444;color:white}.hidden{display:none}#codigo{font-size:45px;font-weight:bold;letter-spacing:8px}#letra{font-size:70px;font-weight:bold}.cats{display:grid;grid-template-columns:1fr 1fr}.player{display:inline-block;background:#374151;padding:8px;margin:4px;border-radius:8px}@media(max-width:600px){.cats{grid-template-columns:1fr}}</style></head><body><main><h1>🛑 STOP</h1><div id="status">🔴 Conectando...</div>
 <div id="menu" class="card"><input id="nome" placeholder="Seu nome"><br><button onclick="criar()">🏠 Criar sala</button><input id="codin" placeholder="Código"><button onclick="entrar()">🚪 Entrar</button></div>
-<div id="jogo" class="hidden"><div class="card"><h2>Código da sala</h2><div id="codigo"></div><div id="players"></div><button id="start" onclick="iniciar()">▶️ Iniciar rodada</button></div><div class="card"><div id="letra">?</div><div id="tempo"></div><div id="cats" class="cats"></div><button onclick="enviar()">📤 Enviar</button><button class="danger" onclick="stop()">🛑 STOP!</button></div><div id="res" class="card hidden"></div></div></main>
+<div id="jogo" class="hidden"><div class="card"><h2>Código da sala</h2><div id="codigo"></div><div id="players"></div><button id="start" onclick="iniciar()">▶️ Iniciar rodada</button></div><div class="card"><div id="letra">?</div><div id="tempo"></div><div id="cats" class="cats"></div><button onclick="enviar()">📤 Enviar</button><button class="danger" onclick="enviarStop()">🛑 STOP!</button></div><div id="res" class="card hidden"></div></div></main>
 <script src="/socket.io/socket.io.js"></script><script>
 const s=io();let dono=false;
 s.on("connect",()=>status("🟢 Conectado ao servidor!"));s.on("connect_error",()=>status("🔴 Servidor não conectado"));s.on("erro",x=>alert(x));
@@ -10,5 +10,14 @@ s.on("estadoSala",x=>{players.innerHTML=x.jogadores.map(p=>`<span class="player"
 s.on("rodada",x=>{res.classList.add("hidden");letra.textContent=x.letra;tempo.textContent=x.tempo+"s";cats.innerHTML=x.categorias.map(c=>`<div><b>${c}</b><br><input id="c_${c}" placeholder="${c}"></div>`).join("")});
 s.on("tempo",x=>tempo.textContent=x+"s");
 s.on("resultado",x=>{res.classList.remove("hidden");res.innerHTML="<h2>🏆 Resultado</h2>"+x.sort((a,b)=>b.pontos-a.pontos).map(p=>`<p>${p.nome}: +${p.pontosRodada} | total ${p.pontos}</p>`).join("")+(dono?'<button onclick="proxima()">🔄 Próxima</button>':"")});
-function status(x){document.getElementById("status").textContent=x}function abrir(c){codigo.textContent=c;menu.classList.add("hidden");jogo.classList.remove("hidden")}function criar(){s.emit("criarSala",nome.value)}function entrar(){s.emit("entrarSala",{nome:nome.value,codigo:codin.value})}function iniciar(){s.emit("iniciar")}function stop(){s.emit("stop")}function proxima(){s.emit("proxima")}function enviar(){let r={};document.querySelectorAll("#cats input").forEach(i=>r[i.id.slice(2)]=i.value);s.emit("respostas",r)}
+function status(x){document.getElementById("status").textContent=x}function abrir(c){codigo.textContent=c;menu.classList.add("hidden");jogo.classList.remove("hidden")}function criar(){s.emit("criarSala",nome.value)}function entrar(){s.emit("entrarSala",{nome:nome.value,codigo:codin.value})}function iniciar(){s.emit("iniciar")}function enviarStop(){
+    let r={};
+
+    document.querySelectorAll("#cats input").forEach(i=>{
+        r[i.id.slice(2)]=i.value;
+    });
+
+    s.emit("respostas",r);
+    s.emit("stop");
+}function proxima(){s.emit("proxima")}function enviar(){let r={};document.querySelectorAll("#cats input").forEach(i=>r[i.id.slice(2)]=i.value);s.emit("respostas",r)}
 </script></body></html>
