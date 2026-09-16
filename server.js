@@ -67,7 +67,7 @@ function escapeHTML(texto) {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
+        .replace(/\"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
 
@@ -99,8 +99,9 @@ function emitirRodada(sala) {
         letra: sala.letra,
         categorias,
         votosPular: 0,
-        votosNecessarios: Math.ceil(sala.jogadores.length / 2),
-        tempoMinimoStop: TEMPO_MINIMO_STOP
+        votosNecessarios: 1,
+        tempoMinimoStop: TEMPO_MINIMO_STOP,
+        dono: sala.dono
     });
     iniciarTimerRespostas(sala);
 }
@@ -142,16 +143,13 @@ function iniciarTimerRespostas(sala) {
 function solicitarPularLetra(sala, socketId) {
     if (!sala.emJogo || sala.fase !== "respostas") return;
     if (!encontrarJogador(sala, socketId)) return;
-    if (!sala.votosPularLetra) sala.votosPularLetra = {};
-    if (sala.votosPularLetra[socketId]) return;
 
-    sala.votosPularLetra[socketId] = true;
-    const votos = Object.keys(sala.votosPularLetra).length;
-    const necessarios = Math.ceil(sala.jogadores.length / 2);
+    if (sala.dono !== socketId) {
+        io.to(socketId).emit("erro", "Somente o dono da sala pode trocar a letra.");
+        return;
+    }
 
-    io.to(sala.codigo).emit("votoPularLetra", { votos, votosNecessarios: necessarios });
-
-    if (votos >= necessarios) pularLetra(sala);
+    pularLetra(sala);
 }
 
 function pararRodada(sala, socketId) {
