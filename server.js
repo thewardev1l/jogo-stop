@@ -21,6 +21,7 @@ app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 const TEMPO_RESPOSTAS = 60;
+const TEMPO_MINIMO_STOP = 12;
 const TEMPO_VOTACAO = 60;
 const TEMPO_RESULTADO = 4;
 
@@ -92,11 +93,14 @@ function emitirRodada(sala) {
     sala.fase = "respostas";
     sala.tempo = TEMPO_RESPOSTAS;
     sala.votosPularLetra = {};
+    sala.podePararEm = TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP;
+
     io.to(sala.codigo).emit("rodada", {
         letra: sala.letra,
         categorias,
         votosPular: 0,
-        votosNecessarios: Math.ceil(sala.jogadores.length / 2)
+        votosNecessarios: Math.ceil(sala.jogadores.length / 2),
+        tempoMinimoStop: TEMPO_MINIMO_STOP
     });
     iniciarTimerRespostas(sala);
 }
@@ -150,8 +154,18 @@ function solicitarPularLetra(sala, socketId) {
     if (votos >= necessarios) pularLetra(sala);
 }
 
-function pararRodada(sala) {
+function pararRodada(sala, socketId) {
     if (!sala.emJogo || sala.fase !== "respostas") return;
+
+    if (sala.tempo > TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP) {
+        const restantes = sala.tempo - (TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP);
+        io.to(socketId).emit(
+            "erro",
+            `O STOP só pode ser apertado após ${TEMPO_MINIMO_STOP} segundos de rodada. Aguarde mais ${restantes} segundo${restantes === 1 ? "" : "s"}.`
+        );
+        return;
+    }
+
     clearInterval(sala.timer);
     sala.fase = "votacao";
     io.to(sala.codigo).emit("stop");
@@ -333,7 +347,7 @@ io.on("connection", socket => {
         salas[codigo] = {
             codigo, dono: socket.id, jogadores: [], emJogo: false, fase: "aguardando",
             letra: "", categoriaAtual: 0, categoriaVotacao: "", respostasVotacao: [],
-            timer: null, tempo: 0, votosPularLetra: {}
+            timer: null, tempo: 0, votosPularLetra: {}, podePararEm: 0
         };
         salas[codigo].jogadores.push(criarJogador(socket.id, nome));
         socket.join(codigo);
@@ -383,17 +397,20 @@ io.on("connection", socket => {
 
     socket.on("stop", () => {
         const sala = encontrarSalaDoJogador(socket.id);
-        if (sala) pararRodada(sala);
+        if (!sala) return;
+        pararRodada(sala, socket.id);
     });
 
     socket.on("pularLetra", () => {
         const sala = encontrarSalaDoJogador(socket.id);
-        if (sala) solicitarPularLetra(sala, socket.id);
+        if (!sala) return;
+        solicitarPularLetra(sala, socket.id);
     });
 
     socket.on("votar", dados => {
         const sala = encontrarSalaDoJogador(socket.id);
-        if (sala) votar(sala, socket.id, dados && dados.jogadorId, dados && dados.voto);
+        if (!sala) return;
+        votar(sala, socket.id, dados.jogadorId, dados.voto);
     });
 
     socket.on("proxima", () => {
@@ -406,8 +423,9 @@ io.on("connection", socket => {
     socket.on("disconnect", () => {
         const sala = encontrarSalaDoJogador(socket.id);
         if (!sala) return;
-        sala.jogadores = sala.jogadores.filter(jogador => jogador.id !== socket.id);
+
         delete sala.votosPularLetra[socket.id];
+        sala.jogadores = sala.jogadores.filter(jogador => jogador.id !== socket.id);
 
         if (sala.dono === socket.id) {
             if (sala.jogadores.length > 0) {
@@ -419,11 +437,13 @@ io.on("connection", socket => {
                 return;
             }
         }
+
         if (sala.jogadores.length === 0) {
             clearInterval(sala.timer);
             delete salas[sala.codigo];
             return;
         }
+
         enviarEstadoSala(sala);
     });
 });
