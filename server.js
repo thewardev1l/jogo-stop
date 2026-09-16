@@ -92,8 +92,9 @@ function prepararRespostas(sala, zerarPontos = true) {
 function emitirRodada(sala) {
     sala.fase = "respostas";
     sala.tempo = TEMPO_RESPOSTAS;
+    sala.timerFim = Date.now() + TEMPO_RESPOSTAS * 1000;
     sala.votosPularLetra = {};
-    sala.podePararEm = TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP;
+    sala.podePararEm = sala.timerFim - TEMPO_MINIMO_STOP * 1000;
 
     io.to(sala.codigo).emit("rodada", {
         letra: sala.letra,
@@ -101,7 +102,8 @@ function emitirRodada(sala) {
         votosPular: 0,
         votosNecessarios: 1,
         tempoMinimoStop: TEMPO_MINIMO_STOP,
-        dono: sala.dono
+        dono: sala.dono,
+        tempo: TEMPO_RESPOSTAS
     });
     iniciarTimerRespostas(sala);
 }
@@ -130,14 +132,22 @@ function gerarLetra() {
 
 function iniciarTimerRespostas(sala) {
     clearInterval(sala.timer);
-    sala.timer = setInterval(() => {
-        sala.tempo--;
-        io.to(sala.codigo).emit("tempo", { tempo: sala.tempo, fase: "respostas" });
-        if (sala.tempo <= 0) {
+    const enviarTempo = () => {
+        if (!sala.emJogo || sala.fase !== "respostas") return;
+
+        const restante = Math.max(0, Math.ceil((sala.timerFim - Date.now()) / 1000));
+        sala.tempo = restante;
+        io.to(sala.codigo).emit("tempo", { tempo: restante, fase: "respostas" });
+
+        if (restante <= 0) {
             clearInterval(sala.timer);
+            sala.timer = null;
             iniciarVotacao(sala);
         }
-    }, 1000);
+    };
+
+    enviarTempo();
+    sala.timer = setInterval(enviarTempo, 250);
 }
 
 function solicitarPularLetra(sala, socketId) {
@@ -155,8 +165,11 @@ function solicitarPularLetra(sala, socketId) {
 function pararRodada(sala, socketId) {
     if (!sala.emJogo || sala.fase !== "respostas") return;
 
-    if (sala.tempo > TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP) {
-        const restantes = sala.tempo - (TEMPO_RESPOSTAS - TEMPO_MINIMO_STOP);
+    const restante = Math.max(0, Math.ceil((sala.timerFim - Date.now()) / 1000));
+    const tempoDecorrido = TEMPO_RESPOSTAS - restante;
+
+    if (tempoDecorrido < TEMPO_MINIMO_STOP) {
+        const restantes = TEMPO_MINIMO_STOP - tempoDecorrido;
         io.to(socketId).emit(
             "erro",
             `O STOP só pode ser apertado após ${TEMPO_MINIMO_STOP} segundos de rodada. Aguarde mais ${restantes} segundo${restantes === 1 ? "" : "s"}.`
@@ -165,6 +178,7 @@ function pararRodada(sala, socketId) {
     }
 
     clearInterval(sala.timer);
+    sala.timer = null;
     sala.fase = "votacao";
     io.to(sala.codigo).emit("stop");
     iniciarVotacao(sala);
@@ -193,6 +207,7 @@ function iniciarCategoriaVotacao(sala) {
 
     sala.respostasVotacao = respostas;
     sala.tempo = TEMPO_VOTACAO;
+    sala.timerFim = Date.now() + TEMPO_VOTACAO * 1000;
     io.to(sala.codigo).emit("votacao", {
         categoria,
         respostas: respostas.map(item => ({
@@ -207,14 +222,22 @@ function iniciarCategoriaVotacao(sala) {
 
 function iniciarTimerVotacao(sala) {
     clearInterval(sala.timer);
-    sala.timer = setInterval(() => {
-        sala.tempo--;
-        io.to(sala.codigo).emit("tempo", { tempo: sala.tempo, fase: "votacao" });
-        if (sala.tempo <= 0) {
+    const enviarTempo = () => {
+        if (!sala.emJogo || sala.fase !== "votacao") return;
+
+        const restante = Math.max(0, Math.ceil((sala.timerFim - Date.now()) / 1000));
+        sala.tempo = restante;
+        io.to(sala.codigo).emit("tempo", { tempo: restante, fase: "votacao" });
+
+        if (restante <= 0) {
             clearInterval(sala.timer);
+            sala.timer = null;
             finalizarCategoriaVotacao(sala);
         }
-    }, 1000);
+    };
+
+    enviarTempo();
+    sala.timer = setInterval(enviarTempo, 250);
 }
 
 function votar(sala, socketId, jogadorAvaliadoId, voto) {
@@ -246,6 +269,7 @@ function verificarTodosVotaram(sala) {
     );
     if (tudoAvaliado) {
         clearInterval(sala.timer);
+        sala.timer = null;
         finalizarCategoriaVotacao(sala);
     }
 }
@@ -253,6 +277,7 @@ function verificarTodosVotaram(sala) {
 function finalizarCategoriaVotacao(sala) {
     if (sala.fase !== "votacao") return;
     clearInterval(sala.timer);
+    sala.timer = null;
     const categoria = sala.categoriaVotacao;
     const aprovadas = [];
 
@@ -323,6 +348,7 @@ function normalizarResposta(resposta) {
 
 function finalizarRodada(sala) {
     clearInterval(sala.timer);
+    sala.timer = null;
     sala.fase = "final";
     sala.emJogo = false;
     const ranking = [...sala.jogadores]
@@ -345,7 +371,7 @@ io.on("connection", socket => {
         salas[codigo] = {
             codigo, dono: socket.id, jogadores: [], emJogo: false, fase: "aguardando",
             letra: "", categoriaAtual: 0, categoriaVotacao: "", respostasVotacao: [],
-            timer: null, tempo: 0, votosPularLetra: {}, podePararEm: 0
+            timer: null, timerFim: 0, tempo: 0, votosPularLetra: {}, podePararEm: 0
         };
         salas[codigo].jogadores.push(criarJogador(socket.id, nome));
         socket.join(codigo);
@@ -415,6 +441,7 @@ io.on("connection", socket => {
         const sala = encontrarSalaDoJogador(socket.id);
         if (!sala || sala.fase !== "votacao") return;
         clearInterval(sala.timer);
+        sala.timer = null;
         finalizarCategoriaVotacao(sala);
     });
 
@@ -422,7 +449,7 @@ io.on("connection", socket => {
         const sala = encontrarSalaDoJogador(socket.id);
         if (!sala) return;
 
-        delete sala.votosPularLetra[socket.id];
+        if (sala.votosPularLetra) delete sala.votosPularLetra[socket.id];
         sala.jogadores = sala.jogadores.filter(jogador => jogador.id !== socket.id);
 
         if (sala.dono === socket.id) {
