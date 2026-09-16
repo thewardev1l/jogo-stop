@@ -1,10 +1,22 @@
 const express = require("express");
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+app.get("/", (req, res) => {
+    const indexPath = path.join(__dirname, "public", "index.html");
+    fs.readFile(indexPath, "utf8", (err, html) => {
+        if (err) return res.status(500).send("Erro ao carregar o jogo.");
+        const script = '<script src="/skip-letra.js"></script>';
+        res.type("html").send(html.replace("</body>", `${script}</body>`));
+    });
+});
+
 app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
@@ -130,7 +142,6 @@ function solicitarPularLetra(sala, socketId) {
     sala.votosPularLetra[socketId] = true;
     const votos = Object.keys(sala.votosPularLetra).length;
     const necessarios = Math.ceil(sala.jogadores.length / 2);
-
     io.to(sala.codigo).emit("votoPularLetra", { votos, votosNecessarios: necessarios });
 
     if (votos >= necessarios) pularLetra(sala);
@@ -155,7 +166,6 @@ function iniciarCategoriaVotacao(sala) {
         finalizarRodada(sala);
         return;
     }
-
     const categoria = categorias[sala.categoriaAtual];
     sala.categoriaVotacao = categoria;
     const respostas = sala.jogadores.map(jogador => ({
@@ -164,7 +174,6 @@ function iniciarCategoriaVotacao(sala) {
         resposta: jogador.respostas[categoria] || "",
         votos: {}
     }));
-
     sala.respostasVotacao = respostas;
     sala.tempo = TEMPO_VOTACAO;
     io.to(sala.codigo).emit("votacao", {
@@ -199,7 +208,6 @@ function votar(sala, socketId, jogadorAvaliadoId, voto) {
         io.to(socketId).emit("erro", "Você não pode votar na sua própria resposta.");
         return;
     }
-
     const resposta = sala.respostasVotacao.find(item => item.jogadorId === jogadorAvaliadoId);
     if (!resposta) return;
     if (resposta.votos[socketId]) {
@@ -207,7 +215,6 @@ function votar(sala, socketId, jogadorAvaliadoId, voto) {
         return;
     }
     if (voto !== "correta" && voto !== "errada") return;
-
     resposta.votos[socketId] = voto;
     io.to(socketId).emit("votoRegistrado", { jogadorId: jogadorAvaliadoId, voto });
     verificarTodosVotaram(sala);
