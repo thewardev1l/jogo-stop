@@ -34,7 +34,9 @@ const categorias = [
     "PCH",
     "Filme/Série",
     "Cantor",
-    "Marca"
+    "Marca",
+    "Minha sogra é...",
+    "Cor"
 ];
 
 const salas = {};
@@ -142,6 +144,7 @@ function solicitarPularLetra(sala, socketId) {
     sala.votosPularLetra[socketId] = true;
     const votos = Object.keys(sala.votosPularLetra).length;
     const necessarios = Math.ceil(sala.jogadores.length / 2);
+
     io.to(sala.codigo).emit("votoPularLetra", { votos, votosNecessarios: necessarios });
 
     if (votos >= necessarios) pularLetra(sala);
@@ -166,6 +169,7 @@ function iniciarCategoriaVotacao(sala) {
         finalizarRodada(sala);
         return;
     }
+
     const categoria = categorias[sala.categoriaAtual];
     sala.categoriaVotacao = categoria;
     const respostas = sala.jogadores.map(jogador => ({
@@ -174,6 +178,7 @@ function iniciarCategoriaVotacao(sala) {
         resposta: jogador.respostas[categoria] || "",
         votos: {}
     }));
+
     sala.respostasVotacao = respostas;
     sala.tempo = TEMPO_VOTACAO;
     io.to(sala.codigo).emit("votacao", {
@@ -208,6 +213,7 @@ function votar(sala, socketId, jogadorAvaliadoId, voto) {
         io.to(socketId).emit("erro", "Você não pode votar na sua própria resposta.");
         return;
     }
+
     const resposta = sala.respostasVotacao.find(item => item.jogadorId === jogadorAvaliadoId);
     if (!resposta) return;
     if (resposta.votos[socketId]) {
@@ -215,6 +221,7 @@ function votar(sala, socketId, jogadorAvaliadoId, voto) {
         return;
     }
     if (voto !== "correta" && voto !== "errada") return;
+
     resposta.votos[socketId] = voto;
     io.to(socketId).emit("votoRegistrado", { jogadorId: jogadorAvaliadoId, voto });
     verificarTodosVotaram(sala);
